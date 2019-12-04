@@ -5,6 +5,10 @@
 %%API
 -export([start_link/0]).
 
+%% Adds the pmodnav_task to the working set
+%% using the Achlys task model
+-export([add_pmodnav_task/0]).
+
 %% gen_server callbacks
 -export([init/1,
 	handle_call/3,
@@ -88,10 +92,6 @@ pmodnav_task() ->
             lasp:map(SourceId, F, DestinationId),
             lasp:update(SourceId, {add, {Acc, Gyro, Mag, Press, Temp, Node}}, self())
     end).
-
-%% Adds the pmodnav_task to the working set
-%% using the Achlys task model
--export([add_pmodnav_task/0]).
 
 add_pmodnav_task() ->
     gen_server:cast(?SERVER 
