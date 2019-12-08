@@ -33,6 +33,7 @@
 %%%===================================================================
 %%% API
 %%%===================================================================
+
 println(What) -> io:format("~p~n", [What]).
 
 %%--------------------------------------------------------------------
@@ -76,7 +77,7 @@ add_pmodnav_task() ->
     {ok , State :: #state{}} | {ok , State :: #state{} , timeout() | hibernate} |
     {stop , Reason :: term()} | ignore).
 init([]) ->
-    ok = loop_schedule_task(10, 3000),
+    ok = loop_schedule_task(5, 1500),
     logger:log(critical, "Running provider ~n"),
     {ok , #state{}}.
 
@@ -199,7 +200,7 @@ loop_schedule_task(Count, Time) ->
       , all
       , single
       , fun() ->
-           io:format("Hello Joe ! ~n"),
+           println(Count),
            loop_schedule_task(Count-1, Time)
   end),
   {task, Task},
@@ -231,6 +232,8 @@ pmodnav_task() ->
                     NewTemp = ((T * 1.8) + 32),
                     {Acc, Gyro, Mag, Press, [NewTemp], Node}
             end,
+            %% {ok, Set} = lasp:query({<<"source">>, state_orset}), sets:to_list(Set).
+            %% {ok, FarenheitSet} = lasp:query({<<"destination">>, state_orset}), sets:to_list(FarenheitSet).
             {ok, {SourceId, _, _, _}} = lasp:declare({<<"source">>, state_orset}, state_orset),
             {ok, {DestinationId, _, _, _}} = lasp:declare({<<"destination">>, state_orset}, state_orset),
             lasp:map(SourceId, F, DestinationId),
@@ -238,6 +241,7 @@ pmodnav_task() ->
     end).
 
 
+  %%=======================
 
 
 %% Execution scenario
