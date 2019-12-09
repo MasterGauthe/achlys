@@ -16,7 +16,9 @@
 
 %% Adds the pmodnav_task to the working set
 %% using the Achlys task model
--export([add_pmodnav_task/0]).
+-export([add_pmodnav_task/0,
+        add_task_1/0,
+        add_task_2/0]).
 
 %% gen_server callbacks
 -export([init/1 ,
@@ -58,6 +60,19 @@ add_pmodnav_task() ->
     gen_server:cast(?SERVER
         , {task, pmodnav_task()}).
 
+-spec(add_task_1() ->
+    {ok , Pid :: pid()} | ignore | {error , Reason :: term()}).
+add_task_1() ->
+    gen_server:cast(?SERVER
+      , {task, task_1()}).
+
+-spec(add_task_2() ->
+    {ok , Pid :: pid()} | ignore | {error , Reason :: term()}).
+add_task_2() ->
+    gen_server:cast(?SERVER
+      , {task, task_2()}).
+
+
 %%%===================================================================
 %%% gen_server callbacks
 %%%===================================================================
@@ -77,7 +92,7 @@ add_pmodnav_task() ->
     {ok , State :: #state{}} | {ok , State :: #state{} , timeout() | hibernate} |
     {stop , Reason :: term()} | ignore).
 init([]) ->
-    ok = loop_schedule_task(5, 1500),
+    ok = loop_schedule_task(1, 1000),
     logger:log(critical, "Running provider ~n"),
     {ok , #state{}}.
 
@@ -239,6 +254,57 @@ pmodnav_task() ->
             lasp:map(SourceId, F, DestinationId),
             lasp:update(SourceId, {add, {Acc, Gyro, Mag, Press, Temp, Node}}, self())
     end).
+
+  task_1() ->
+      %% Declare an Achlys task that will be periodically
+      %% executed as long as the node is up
+      Task = achlys:declare(task_1
+          , all
+          , single
+          , fun() ->
+              logger:log(notice, "Reading PmodNAV pressure interval ~n"),
+              %Press0 = pmod_nav:read(alt, [press_out]),
+              Press0 = [rand:uniform(10)],
+              %% 50 ms interval
+              %%timer:sleep(50),
+              %Press1 = pmod_nav:read(alt, [press_out]),
+              Press1 = [rand:uniform(10)],
+              Node = erlang:node(),
+              F = fun({Press0, Press1, Node}) ->
+                      [P0] = Press0,
+                      [P1] = Press1,
+                      Delta = abs(P0 - P1),
+                      {[Delta], Node}
+              end,
+              %% {ok, Set} = lasp:query({<<"source">>, state_orset}), sets:to_list(Set).
+              %% {ok, FarenheitSet} = lasp:query({<<"destination">>, state_orset}), sets:to_list(FarenheitSet).
+
+              {ok, {SourceId, _, _, _}} = lasp:declare({<<"source">>, state_orset}, state_orset),
+              {ok, {DestinationId, _, _, _}} = lasp:declare({<<"destination">>, state_orset}, state_orset),
+              lasp:map(SourceId, F, DestinationId),
+              lasp:update(SourceId, {add, {Press0, Press1, Node}}, self())
+      end).
+
+    task_2() ->
+        Task = achlys:declare(task_2
+            , all
+            , single
+            , fun() ->
+                logger:log(notice, "Reading PmodNAV pressure interval ~n"),
+                Temp = pmod_nav:read(alt, [temp_out]),
+                %%Press0 = [rand:uniform(10)],
+                Node = erlang:node(),
+
+                EWType = state_ewflag,
+                EWVarName = <<"ewvar">>,
+                {ok, {EW, _, _, _}} = lasp:declare({EWVarName, EWType}, EWType),
+                if
+                  Temp > 0 -> {ok, {EW1, _, _, _}} = lasp:update(EW, enable, self());
+                  true -> {ok, {EW1, _, _, _}} = lasp:update(EW, disable, self())
+                end,
+                {ok, EWRes1} = lasp:query(EW1),
+                println(EWRes1)
+        end).
 
 
   %%=======================
