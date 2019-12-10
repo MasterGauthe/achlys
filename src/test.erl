@@ -45,7 +45,7 @@ average(List) ->
 variance(List) ->
   Mean = average(List),
   NewList = lists:flatmap(fun(Elem)->
-                              (abs(Elem-Mean))*(abs(Elem-Mean))
+                              [(abs(Elem-Mean))*(abs(Elem-Mean))]
                           end, List),
   average(NewList).
 
@@ -352,7 +352,8 @@ show() ->
           Buffer = lists:foldl(fun
             (Elem,AccIn) ->
               timer : sleep(SampleRate), %10 measurements per minute
-              Temp = pmod_nav:read(acc,[out_temp]),
+              %Temp = pmod_nav:read(acc,[out_temp]),
+              Temp = [rand:uniform(10)],
               Temp ++ AccIn
             end,[],lists:seq(1,Len)),
 
@@ -363,7 +364,7 @@ show() ->
               "current" ->
                   Current = pmod_nav:read(acc,[out_temp]),
                   lasp : update (SourceId , {add , {Current , Name}}, Pid ),
-                  println(Min);
+                  println(Current);
               "min" ->
                   Min = lists:min(Buffer),
                   lasp : update (SourceId , {add , {Min , Name}}, Pid ),
@@ -379,7 +380,7 @@ show() ->
               "variance" ->
                 Var = variance(Buffer),
                 lasp : update (SourceId , {add , {Var , Name}}, Pid),
-                println(Mean)
+                println(Var)
             end
 
           end).
