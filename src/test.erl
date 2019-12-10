@@ -21,7 +21,7 @@ show/0,
 add_task_mintemp/0,
 add_task_meantemp/0,
 add_task_1/1,
-add_task_2/0]).
+add_task_temp/1]).
 
 %% gen_server callbacks
 -export([init/1 ,
@@ -88,11 +88,11 @@ show() ->
       gen_server:cast(?SERVER
       , {task, task_1(Threshold)}).
 
-    -spec(add_task_2() ->
+    -spec(add_task_temp(_Mode) ->
       {ok , Pid :: pid()} | ignore | {error , Reason :: term()}).
-    add_task_2() ->
+    add_task_temp(Mode) ->
       gen_server:cast(?SERVER
-      , {task, task_2()}).
+      , {task, temp(Mode)}).
 
     -spec(add_task_meantemp() ->
       {ok , Pid :: pid()} | ignore | {error , Reason :: term()}).
@@ -349,16 +349,7 @@ show() ->
           end).
 
 
-        task_2() ->
-          Task = achlys:declare(task_2
-          , all
-          , single
-          , fun() ->
-            println(1)
-          end).
-
-
-        temp_task(Mode) ->
+        temp(Mode) ->
         Task = achlys:declare(temp_task,
         all,
         single,
@@ -385,7 +376,7 @@ show() ->
                 Mean = average(Buffer),
                 lasp : update (SourceId , {add , {Mean , Name}}, Pid),
                 println(Mean)
-            end.
+            end
 
           end).
 
