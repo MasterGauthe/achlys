@@ -17,6 +17,7 @@
 %% Adds the pmodnav_task to the working set
 %% using the Achlys task model
 -export([add_pmodnav_task/0,
+        show/0,
         add_task_1/0,
         add_task_2/0]).
 
@@ -48,6 +49,15 @@ println(What) -> io:format("~p~n", [What]).
     {ok , Pid :: pid()} | ignore | {error , Reason :: term()}).
 start_link() ->
     gen_server:start_link({local , ?SERVER} , ?MODULE , [] , []).
+
+  -spec(show() ->
+      {ok , Pid :: pid()} | ignore | {error , Reason :: term()}).
+  show() ->
+    EWType = state_ewflag,
+    EWVarName = <<"ewvar">>,
+    {ok, {EW, _, _, _}} = lasp:declare({EWVarName, EWType}, EWType),
+    {ok, EWRes0} = lasp:query(EW),
+    println(EWRes0).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -92,7 +102,7 @@ add_task_2() ->
     {ok , State :: #state{}} | {ok , State :: #state{} , timeout() | hibernate} |
     {stop , Reason :: term()} | ignore).
 init([]) ->
-    ok = loop_schedule_task(1, 1000),
+    ok = loop_schedule_task(1, 200),
     logger:log(critical, "Running provider ~n"),
     {ok , #state{}}.
 
@@ -264,20 +274,38 @@ pmodnav_task() ->
           , fun() ->
               logger:log(notice, "Reading PmodNAV pressure interval ~n"),
               %Press0 = pmod_nav:read(alt, [press_out]),
-              Press0 = [rand:uniform(10)],
+              Press0 = rand:uniform(10),
               %% 50 ms interval
-              %%timer:sleep(50),
+              timer:sleep(2000),
               %Press1 = pmod_nav:read(alt, [press_out]),
-              Press1 = [rand:uniform(10)],
+              Press1 = rand:uniform(10),
               Node = erlang:node(),
+
+              EWType = state_ewflag,
+              EWVarName = <<"ewvar">>,
+              {ok, {EW, _, _, _}} = lasp:declare({EWVarName, EWType}, EWType),
+
+              {ok, EWRes0} = lasp:query(EW),
+              println(EWRes0),
+
+              if
+                abs(Press0 - Press1) > 2 -> {ok, {EW1, _, _, _}} = lasp:update(EW, enable, self()),
+                %grisp_led : color (1, green );
+                true -> {ok, {EW1, _, _, _}} = lasp:update(EW, disable, self()),
+                %grisp_led : color (2, red )
+              end,
+
               F = fun({Press0, Press1, Node}) ->
-                      [P0] = Press0,
-                      [P1] = Press1,
+                      P0 = Press0,
+                      P1 = Press1,
                       Delta = abs(P0 - P1),
-                      {[Delta], Node}
+                      {Delta, Node}
               end,
               %% {ok, Set} = lasp:query({<<"source">>, state_orset}), sets:to_list(Set).
               %% {ok, FarenheitSet} = lasp:query({<<"destination">>, state_orset}), sets:to_list(FarenheitSet).
+
+              {ok, EWRes1} = lasp:query(EW1),
+              println(EWRes1),
 
               {ok, {SourceId, _, _, _}} = lasp:declare({<<"source">>, state_orset}, state_orset),
               {ok, {DestinationId, _, _, _}} = lasp:declare({<<"destination">>, state_orset}, state_orset),
@@ -285,25 +313,25 @@ pmodnav_task() ->
               lasp:update(SourceId, {add, {Press0, Press1, Node}}, self())
       end).
 
+
+
+
+
+
+
+
+
+
+
+
+
+
     task_2() ->
         Task = achlys:declare(task_2
             , all
             , single
             , fun() ->
-                logger:log(notice, "Reading PmodNAV pressure interval ~n"),
-                Temp = pmod_nav:read(alt, [temp_out]),
-                %%Press0 = [rand:uniform(10)],
-                Node = erlang:node(),
-
-                EWType = state_ewflag,
-                EWVarName = <<"ewvar">>,
-                {ok, {EW, _, _, _}} = lasp:declare({EWVarName, EWType}, EWType),
-                if
-                  Temp > 0 -> {ok, {EW1, _, _, _}} = lasp:update(EW, enable, self());
-                  true -> {ok, {EW1, _, _, _}} = lasp:update(EW, disable, self())
-                end,
-                {ok, EWRes1} = lasp:query(EW1),
-                println(EWRes1)
+                println(1)
         end).
 
 
