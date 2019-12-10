@@ -20,7 +20,7 @@
         show/0,
         add_task_mintemp/0,
         add_task_meantemp/0,
-        add_task_1/0,
+        add_task_1/1,
         add_task_2/0]).
 
 %% gen_server callbacks
@@ -40,6 +40,9 @@
 %%%===================================================================
 
 println(What) -> io:format("~p~n", [What]).
+
+average(List) ->
+    lists:sum(List) / length(List).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -79,11 +82,11 @@ add_pmodnav_task() ->
     gen_server:cast(?SERVER
         , {task, pmodnav_task()}).
 
--spec(add_task_1() ->
+-spec(add_task_1(_Threshold) ->
     {ok , Pid :: pid()} | ignore | {error , Reason :: term()}).
-add_task_1() ->
+add_task_1(Threshold) ->
     gen_server:cast(?SERVER
-      , {task, task_1()}).
+      , {task, task_1(Threshold)}).
 
 -spec(add_task_2() ->
     {ok , Pid :: pid()} | ignore | {error , Reason :: term()}).
@@ -287,7 +290,7 @@ pmodnav_task() ->
             lasp:update(SourceId, {add, {Acc, Gyro, Mag, Press, Temp, Node}}, self())
     end).
 
-  task_1() ->
+  task_1(Threshold) ->
       %% Declare an Achlys task that will be periodically
       %% executed as long as the node is up
       Task = achlys:declare(task_1
@@ -317,7 +320,7 @@ pmodnav_task() ->
               println(EWRes0),
 
               if
-                abs(Press0 - Press1) > -1 -> {ok, {EW1, _, _, _}} = lasp:update(EW, enable, self()),
+                abs(Press0 - Press1) > Threshold -> {ok, {EW1, _, _, _}} = lasp:update(EW, enable, self()),
                 {ok, {GCount1, _, _, _}} = lasp:update(GCount, increment, self());
                 %grisp_led : color (1, green );
                 true -> {ok, {EW1, _, _, _}} = lasp:update(EW, disable, self())
@@ -379,7 +382,6 @@ pmodnav_task() ->
                             lasp : update (SourceId , {add , {Min , Name}}, Pid ),
                             println(Min)
 
-
     end).
 
   meantemp_task() ->
@@ -394,18 +396,11 @@ pmodnav_task() ->
                             Buffer = lists:foldl(fun
                               (Elem,AccIn) ->
                                   timer : sleep(6000), %10 measurements per minute
-                                  Temp = pmod_nav:read(acc,[out_temp]),
+                                  %%Temp = pmod_nav:read(acc,[out_temp]),
+                                  Temp = [rand:uniform(10)],
                                   Temp ++ AccIn
                             end,[],lists:seq(1,Len)),
-
-                            Sum = lists:foldl(fun
-                                (Elem,AccIn) ->
-                                    {_,Temp} = Elem,
-                                    Temp + AccIn
-                                end,0,Buffer),
-
-                            Mean = {Len, (Sum/Len)},
-
+                            Mean = average(Buffer),
                             Name = node(),
                             Pid = self(),
                             lasp : update (SourceId , {add , {Mean , Name}}, Pid),
