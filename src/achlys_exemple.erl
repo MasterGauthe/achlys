@@ -82,6 +82,19 @@ add_task_2() ->
     gen_server:cast(?SERVER
       , {task, task_2()}).
 
+-spec(add_task_meantemp() ->
+      {ok , Pid :: pid()} | ignore | {error , Reason :: term()}).
+  add_task_meantemp() ->
+      gen_server:cast(?SERVER
+        , {task, meantemp_task()}).
+
+
+-spec(add_task_mintemp() ->
+      {ok , Pid :: pid()} | ignore | {error , Reason :: term()}).
+    add_task_mintemp() ->
+      gen_server:cast(?SERVER
+        , {task, mintemp_task()}).
+
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -264,6 +277,57 @@ pmodnav_task() ->
             lasp:map(SourceId, F, DestinationId),
             lasp:update(SourceId, {add, {Acc, Gyro, Mag, Press, Temp, Node}}, self())
     end).
+
+  mintemp_task() ->
+    Task = achlys:declare(pmod_nav,
+                          all,
+                          single,
+                          fun() ->
+                            SourceId = {<<"temp">>, state_gset},
+                            {ok , {_Id , _Meta , _Type , _State }} = lasp : declare (Id , state_gset),
+
+                            Len = 5,
+                            Sum = lists:foldl(fun
+                              (Elem,AccIn) ->
+                                  timer : sleep(6000), %10 measurements per minute
+                                  Temp = pmod_nav:read(acc,[out_temp]),
+                                  Temp ++ AccIn
+                            end,[],lists:seq(1,5)),
+
+                            Min = lists:min(Sum),
+
+                            Name = node(),
+                            Pid = self(),
+                            lasp : update (SourceId , {add , {Min , Name}}, Pid ).
+
+
+    end).
+
+  meantemp_task() ->
+    Task = achlys:declare(pmod_nav,
+                          all,
+                          single,
+                          fun() ->
+                            Id = {<<"temp">>, state_gset},
+                            {ok , {_Id , _Meta , _Type , _State }} = lasp : declare (Id , state_gset),
+
+                            Len = 5,
+                            Sum = lists:foldl(fun
+                              (Elem,AccIn) ->
+                                  timer : sleep(6000), %10 measurements per minute
+                                  Temp = pmod_nav:read(acc,[out_temp]),
+                                  Temp + AccIn
+                            end,[],lists:seq(1,Len)),
+
+                            Mean = {Len, (Sum/Len)},
+
+                            Name = node(),
+                            Pid = self(),
+                            lasp : update (SourceId , {add , {Mean , Name}}, Pid).
+    end).
+
+
+
 
   task_1() ->
       %% Declare an Achlys task that will be periodically
