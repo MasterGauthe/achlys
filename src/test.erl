@@ -19,6 +19,7 @@
 -export([add_pmodnav_task/0,
 show/0,
 add_task_1/1,
+add_task_2/0,
 add_task_temp/3]).
 
 %% gen_server callbacks
@@ -39,6 +40,8 @@ code_change/3]).
 
 println(What) -> io:format("~p~n", [What]).
 
+printbis(What) -> io:fwrite([What]).
+
 average(List) ->
   lists:sum(List) / length(List).
 
@@ -48,6 +51,11 @@ variance(List) ->
                               [(abs(Elem-Mean))*(abs(Elem-Mean))]
                           end, List),
   average(NewList).
+
+print(List) ->
+  erlang:display("["),
+  lists:foreach(fun(Y) -> printbis(Y) end, List),
+  erlang:display("]").
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -70,11 +78,19 @@ show() ->
 
   {ok, {GCount, _, _, _}} = lasp:declare({GCountVarName, GCountType}, GCountType),
   {ok, GCountRes0} = lasp:query(GCount),
-    {ok, {EW, _, _, _}} = lasp:declare({EWVarName, EWType}, EWType),
-    {ok, EWRes0} = lasp:query(EW),
+  {ok, {EW, _, _, _}} = lasp:declare({EWVarName, EWType}, EWType),
+  {ok, EWRes0} = lasp:query(EW),
 
-      println(GCountRes0),
-      println(EWRes0).
+  println(GCountRes0),
+  println(EWRes0),
+
+  {ok, {Alpha, _, _, _}} = lasp:declare({<<"best_max">>, state_orset}, state_orset),
+  {ok , Sa} = lasp:query(Alpha) ,
+  println(sets:to_list(Sa)),
+
+  {ok, {Beta, _, _, _}} = lasp:declare({<<"best_min">>, state_orset}, state_orset),
+  {ok , Sb} = lasp:query(Beta) ,
+  println(sets:to_list(Sb)).
 
     %%--------------------------------------------------------------------
     %% @doc
@@ -92,6 +108,12 @@ show() ->
     add_task_1(Threshold) ->
       gen_server:cast(?SERVER
       , {task, task_1(Threshold)}).
+
+    -spec(add_task_2() ->
+      {ok , Pid :: pid()} | ignore | {error , Reason :: term()}).
+    add_task_2() ->
+      gen_server:cast(?SERVER
+      , {task, task_2()}).
 
     -spec(add_task_temp(_Mode,_Len,_SampleRate) ->
       {ok , Pid :: pid()} | ignore | {error , Reason :: term()}).
@@ -307,17 +329,17 @@ show() ->
       {ok, {GCount, _, _, _}} = lasp:declare({GCountVarName, GCountType}, GCountType),
 
       {ok, GCountRes0} = lasp:query(GCount),
-        {ok, EWRes0} = lasp:query(EW),
-          println(GCountRes0),
-          println(EWRes0),
+      {ok, EWRes0} = lasp:query(EW),
+      println(GCountRes0),
+      println(EWRes0),
 
-          if
-            abs(Press0 - Press1) > Threshold -> {ok, {EW1, _, _, _}} = lasp:update(EW, enable, self()),
-            {ok, {GCount1, _, _, _}} = lasp:update(GCount, increment, self());
+      if
+          abs(Press0 - Press1) > Threshold -> {ok, {EW1, _, _, _}} = lasp:update(EW, enable, self()),
+          {ok, {GCount1, _, _, _}} = lasp:update(GCount, increment, self());
           %grisp_led : color (1, green );
           true -> {ok, {EW1, _, _, _}} = lasp:update(EW, disable, self())
           %grisp_led : color (2, red )
-        end,
+      end,
 
         F = fun({Press0, Press1, Node}) ->
           P0 = Press0,
@@ -330,15 +352,16 @@ show() ->
         %% {ok, FarenheitSet} = lasp:query({<<"destination">>, state_orset}), sets:to_list(FarenheitSet).
 
         {ok, GCountRes1} = lasp:query(GCount),
-          {ok, EWRes1} = lasp:query(EW),
-            println(GCountRes1),
-            println(EWRes1),
+        {ok, EWRes1} = lasp:query(EW),
+        println(GCountRes1),
+        println(EWRes1),
 
-            {ok, {SourceId, _, _, _}} = lasp:declare({<<"source">>, state_orset}, state_orset),
-            {ok, {DestinationId, _, _, _}} = lasp:declare({<<"destination">>, state_orset}, state_orset),
-            lasp:map(SourceId, F, DestinationId),
-            lasp:update(SourceId, {add, {Press0, Press1, Node}}, self())
-          end).
+        {ok, {SourceId, _, _, _}} = lasp:declare({<<"source">>, state_orset}, state_orset),
+        {ok, {DestinationId, _, _, _}} = lasp:declare({<<"destination">>, state_orset}, state_orset),
+        lasp:map(SourceId, F, DestinationId),
+        lasp:update(SourceId, {add, {Press0, Press1, Node}}, self())
+
+    end).
 
 
       temp(Mode, Len, SampleRate) ->
@@ -381,8 +404,43 @@ show() ->
                 Var = variance(Buffer),
                 lasp : update (SourceId , {add , {Var , Name}}, Pid),
                 println(Var)
-            end
+            end,
+            println(lasp:query(SourceId))
 
+          end).
+
+
+        task_2() ->
+          Task = achlys:declare(task_2
+          , all
+          , permanent
+          , fun() ->
+            logger:log(notice, "Reading PmodNAV pressure interval ~n"),
+            Temp = rand:uniform(100),
+            Node = erlang:node(),
+
+            {ok, {SourceId, _, _, _}} = lasp:declare({<<"source">>, state_orset}, state_orset),
+            {ok, {BestMax, _, _, _}} = lasp:declare({<<"best_max">>, state_orset}, state_orset),
+            {ok, {Count, _, _, _}} = lasp:declare({<<"gcountvar">>, state_gcounter}, state_gcounter),
+
+            {ok , Smax} = lasp:query(BestMax) ,
+            {ok, Length} = lasp:query(Count),
+
+            if
+                Length == 0 -> lasp:update(BestMax, {add, 1}, self()),
+                Max = 1;
+                true -> Max = lists:max(sets:to_list(Smax))
+            end,
+
+            println(Max),
+            
+            if
+                Temp > Max -> lasp:update(BestMax, {add, Temp}, self());
+                true -> ok
+            end,
+
+            lasp:update(SourceId, {add, {Temp, Node}}, self()),
+            lasp:update(Count, increment, self())
           end).
 
 
