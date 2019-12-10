@@ -283,15 +283,21 @@ pmodnav_task() ->
 
               EWType = state_ewflag,
               EWVarName = <<"ewvar">>,
-              {ok, {EW, _, _, _}} = lasp:declare({EWVarName, EWType}, EWType),
+              GCountType = state_gcounter,
+              GCountVarName = <<"gcountvar">>,
 
+              {ok, {EW, _, _, _}} = lasp:declare({EWVarName, EWType}, EWType),
+              {ok, {GCount, _, _, _}} = lasp:declare({GCountVarName, GCountType}, GCountType),
+
+              {ok, GCountRes1} = lasp:query(GCount),
               {ok, EWRes0} = lasp:query(EW),
               println(EWRes0),
+              println(GCountRes1),
 
               if
-                abs(Press0 - Press1) > 2 -> {ok, {EW1, _, _, _}} = lasp:update(EW, enable, self()),
+                abs(Press0 - Press1) > 2 -> {ok, {EW1, _, _, _}} = lasp:update(EW, enable, self());
                 %grisp_led : color (1, green );
-                true -> {ok, {EW1, _, _, _}} = lasp:update(EW, disable, self()),
+                true -> {ok, {EW1, _, _, _}} = lasp:update(EW, disable, self())
                 %grisp_led : color (2, red )
               end,
 
