@@ -40,8 +40,6 @@ code_change/3]).
 
 println(What) -> io:format("~p~n", [What]).
 
-printbis(What) -> io:fwrite([What]).
-
 average(List) ->
   lists:sum(List) / length(List).
 
@@ -51,11 +49,6 @@ variance(List) ->
                               [(abs(Elem-Mean))*(abs(Elem-Mean))]
                           end, List),
   average(NewList).
-
-print(List) ->
-  erlang:display("["),
-  lists:foreach(fun(Y) -> printbis(Y) end, List),
-  erlang:display("]").
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -86,11 +79,7 @@ show() ->
 
   {ok, {Alpha, _, _, _}} = lasp:declare({<<"best_max">>, state_orset}, state_orset),
   {ok , Sa} = lasp:query(Alpha) ,
-  println(sets:to_list(Sa)),
-
-  {ok, {Beta, _, _, _}} = lasp:declare({<<"best_min">>, state_orset}, state_orset),
-  {ok , Sb} = lasp:query(Beta) ,
-  println(sets:to_list(Sb)).
+  println(sets:to_list(Sa)).
 
     %%--------------------------------------------------------------------
     %% @doc
@@ -304,6 +293,8 @@ show() ->
       lasp:update(SourceId, {add, {Acc, Gyro, Mag, Press, Temp, Node}}, self())
     end).
 
+  %%%===================================================================
+
   task_1(Threshold) ->
     %% Declare an Achlys task that will be periodically
     %% executed as long as the node is up
@@ -314,7 +305,6 @@ show() ->
       logger:log(notice, "Reading PmodNAV pressure interval ~n"),
       %Press0 = pmod_nav:read(alt, [press_out]),
       Press0 = rand:uniform(10),
-      %% 50 ms interval
       %timer:sleep(2000),
       %Press1 = pmod_nav:read(alt, [press_out]),
       Press1 = rand:uniform(10),
@@ -348,9 +338,6 @@ show() ->
           {Delta, Node}
         end,
 
-        %% {ok, Set} = lasp:query({<<"source">>, state_orset}), sets:to_list(Set).
-        %% {ok, FarenheitSet} = lasp:query({<<"destination">>, state_orset}), sets:to_list(FarenheitSet).
-
         {ok, GCountRes1} = lasp:query(GCount),
         {ok, EWRes1} = lasp:query(EW),
         println(GCountRes1),
@@ -363,6 +350,7 @@ show() ->
 
     end).
 
+%%%===================================================================
 
       temp(Mode, Len, SampleRate) ->
         Task = achlys:declare(temp_task,
@@ -406,9 +394,9 @@ show() ->
                 println(Var)
             end,
             println(lasp:query(SourceId))
-
           end).
 
+%%%===================================================================
 
         task_2() ->
           Task = achlys:declare(task_2
@@ -418,107 +406,29 @@ show() ->
             logger:log(notice, "Reading PmodNAV pressure interval ~n"),
             Temp = rand:uniform(100),
             Node = erlang:node(),
-
             {ok, {SourceId, _, _, _}} = lasp:declare({<<"source">>, state_orset}, state_orset),
             {ok, {BestMax, _, _, _}} = lasp:declare({<<"best_max">>, state_orset}, state_orset),
             {ok, {Count, _, _, _}} = lasp:declare({<<"gcountvar">>, state_gcounter}, state_gcounter),
-
             {ok , Smax} = lasp:query(BestMax) ,
             {ok, Length} = lasp:query(Count),
-
             if
                 Length == 0 -> lasp:update(BestMax, {add, 1}, self()),
                 Max = 1;
                 true -> Max = lists:max(sets:to_list(Smax))
             end,
-
             println(Max),
-            
             if
                 Temp > Max -> lasp:update(BestMax, {add, Temp}, self());
                 true -> ok
             end,
-
             lasp:update(SourceId, {add, {Temp, Node}}, self()),
             lasp:update(Count, increment, self())
           end).
 
 
-            %%=======================
+%%%===================================================================
 
-
-            %% Execution scenario
-            %% ==================
-            %%
-            %% Node 1 shell :
-            %% --------------
-            %%
-            %% $ make shell n=1 PEER_PORT=27001
-            %% ...
-            %% booting up
-            %% ...
-            %%
-            %% (achlys1@130.104.213.164)1> achlys_task_provider:start_link().
-            %% {ok,<0.806.0>}
-            %% (achlys1@130.104.213.164)2> Hello Joe !
-            %% (achlys1@130.104.213.164)2> achlys_task_provider:add_pmodnav_task().
-            %% ok
-            %% (achlys1@130.104.213.164)3>
-            %% (achlys1@130.104.213.164)3> {ok, Set} = lasp:query({<<"source">>, state_orset}), sets:to_list(Set).
-            %% [{[-1.3732929999999999,-0.789584,-0.23198300000000002],
-            %%   [0.0,0.0,0.0],
-            %%   [0.0,0.0,0.0],
-            %%   [0.0],
-            %%   [42.5],
-            %%   'achlys1@130.104.213.164'}]
-            %% (achlys1@130.104.213.164)4>
-            %% (achlys1@130.104.213.164)4> {ok, FarenheitSet} = lasp:query({<<"destination">>, state_orset}), sets:to_list(FarenheitSet).
-            %% [{[-1.3732929999999999,-0.789584,-0.23198300000000002],
-            %%   [0.0,0.0,0.0],
-            %%   [0.0,0.0,0.0],
-            %%   [0.0],
-            %%   [108.5],
-            %%   'achlys1@130.104.213.164'}]
-            %% (achlys1@130.104.213.164)5>
-            %%
-            %% Now start a second Achlys shell :
-            %%
-            %% Node 2 shell :
-            %% --------------
-            %%
-            %% $ make shell n=2 PEER_PORT=27002
-            %% ...
-            %% booting up
-            %% ...
-            %%
-            %% (achlys2@130.104.213.164)1> achlys_util:add_node('achlys1@130.104.213.164').
-            %% ok
-            %% (achlys2@130.104.213.164)2> Hello Joe !
-            %%
-            %% (achlys2@130.104.213.164)2>
-            %% (achlys2@130.104.213.164)2> {ok, FarenheitSet} = lasp:query({<<"destination">>, state_orset}), sets:to_list(FarenheitSet).
-            %% [{[-1.733376,-1.7716230000000002,0.24387799999999998],
-            %%   [0.0,0.0,0.0],
-            %%   [0.0,0.0,0.0],
-            %%   [0.0],
-            %%   [108.5],
-            %%   'achlys2@130.104.213.164'},
-            %%  {[-1.3732929999999999,-0.789584,-0.23198300000000002],
-            %%   [0.0,0.0,0.0],
-            %%   [0.0,0.0,0.0],
-            %%   [0.0],
-            %%   [108.5],
-            %%   'achlys1@130.104.213.164'}]
-            %% (achlys2@130.104.213.164)3>
-            %% (achlys2@130.104.213.164)3> achlys:get_all_tasks().
-            %% [{#{execution_type => <<1>>,
-            %%     function => #Fun<achlys_task_provider.0.44631258>,
-            %%     name => mytask,
-            %%     targets => <<0>>},
-            %%   128479609},
-            %%  {#{execution_type => <<1>>,
-            %%     function => #Fun<achlys_task_provider.1.44631258>,
-            %%     name => pmodnav_task,
-            %%     targets => <<0>>},
-            %%   30190207}]
-            %% (achlys2@130.104.213.164)4>
+%% {ok, Set} = lasp:query({<<"source">>, state_orset}), sets:to_list(Set).
+%% {ok, FarenheitSet} = lasp:query({<<"destination">>, state_orset}), sets:to_list(FarenheitSet).
+%% achlys_util:add_node('achlys1@130.104.213.164').
+%% (achlys2@130.104.213.164)3> achlys:get_all_tasks().
