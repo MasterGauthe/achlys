@@ -18,10 +18,8 @@
 %% using the Achlys task model
 -export([add_pmodnav_task/0,
 show/0,
-add_task_mintemp/0,
-add_task_meantemp/0,
 add_task_1/1,
-add_task_temp/1]).
+add_task_temp/3]).
 
 %% gen_server callbacks
 -export([init/1 ,
@@ -88,24 +86,11 @@ show() ->
       gen_server:cast(?SERVER
       , {task, task_1(Threshold)}).
 
-    -spec(add_task_temp(_Mode) ->
+    -spec(add_task_temp(_Mode,_Len,_SampleRate) ->
       {ok , Pid :: pid()} | ignore | {error , Reason :: term()}).
-    add_task_temp(Mode) ->
+    add_task_temp(Mode,Len,SampleRate) ->
       gen_server:cast(?SERVER
-      , {task, temp(Mode)}).
-
-    -spec(add_task_meantemp() ->
-      {ok , Pid :: pid()} | ignore | {error , Reason :: term()}).
-    add_task_meantemp() ->
-      gen_server:cast(?SERVER
-      , {task, meantemp_task()}).
-
-
-    -spec(add_task_mintemp() ->
-      {ok , Pid :: pid()} | ignore | {error , Reason :: term()}).
-    add_task_mintemp() ->
-      gen_server:cast(?SERVER
-      , {task, mintemp_task()}).
+      , {task, temp(Mode,Len,SampleRate)}).
 
 
     %%%===================================================================
@@ -349,7 +334,7 @@ show() ->
           end).
 
 
-        temp(Mode) ->
+      temp(Mode, Len, SampleRate) ->
         Task = achlys:declare(temp_task,
         all,
         single,
@@ -357,10 +342,9 @@ show() ->
           SourceId = {<<"temp">>, state_gset},
           {ok , {_SourceId , _Meta , _Type , _State }} = lasp : declare (SourceId , state_gset),
 
-          Len = 5,
           Buffer = lists:foldl(fun
             (Elem,AccIn) ->
-              timer : sleep(6000), %10 measurements per minute
+              timer : sleep(SampleRate), %10 measurements per minute
               Temp = pmod_nav:read(acc,[out_temp]),
               Temp ++ AccIn
             end,[],lists:seq(1,5)),
@@ -379,57 +363,6 @@ show() ->
             end
 
           end).
-
-
-
-        mintemp_task() ->
-          Task = achlys:declare(mintemp_task,
-          all,
-          single,
-          fun() ->
-            SourceId = {<<"temp">>, state_gset},
-            {ok , {_SourceId , _Meta , _Type , _State }} = lasp : declare (SourceId , state_gset),
-
-            Len = 5,
-            Buffer = lists:foldl(fun
-              (Elem,AccIn) ->
-                timer : sleep(6000), %10 measurements per minute
-                Temp = pmod_nav:read(acc,[out_temp]),
-                Temp ++ AccIn
-              end,[],lists:seq(1,5)),
-
-              Min = lists:min(Buffer),
-
-              Name = node(),
-              Pid = self(),
-              lasp : update (SourceId , {add , {Min , Name}}, Pid ),
-              println(Min)
-
-            end).
-
-          meantemp_task() ->
-            Task = achlys:declare(meantemp_task,
-            all,
-            single,
-            fun() ->
-              SourceId = {<<"temp">>, state_gset},
-              {ok , {_SourceId , _Meta , _Type , _State }} = lasp : declare (SourceId , state_gset),
-
-              Len = 5,
-              Buffer = lists:foldl(fun
-                (Elem,AccIn) ->
-                  timer : sleep(6000), %10 measurements per minute
-                  %%Temp = pmod_nav:read(acc,[out_temp]),
-                  Temp = [rand:uniform(10)],
-                  Temp ++ AccIn
-                end,[],lists:seq(1,Len)),
-                Mean = average(Buffer),
-                Name = node(),
-                Pid = self(),
-                lasp : update (SourceId , {add , {Mean , Name}}, Pid),
-                println(Mean)
-              end).
-
 
 
             %%=======================
