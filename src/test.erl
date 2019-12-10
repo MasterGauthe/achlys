@@ -365,14 +365,14 @@ pmodnav_task() ->
                             {ok , {_SourceId , _Meta , _Type , _State }} = lasp : declare (SourceId , state_gset),
 
                             Len = 5,
-                            Sum = lists:foldl(fun
+                            Buffer = lists:foldl(fun
                               (Elem,AccIn) ->
                                   timer : sleep(6000), %10 measurements per minute
                                   Temp = pmod_nav:read(acc,[out_temp]),
                                   Temp ++ AccIn
                             end,[],lists:seq(1,5)),
 
-                            Min = lists:min(Sum),
+                            Min = lists:min(Buffer),
 
                             Name = node(),
                             Pid = self(),
@@ -391,14 +391,20 @@ pmodnav_task() ->
                             {ok , {_SourceId , _Meta , _Type , _State }} = lasp : declare (SourceId , state_gset),
 
                             Len = 5,
-                            Sum = lists:foldl(fun
+                            Buffer = lists:foldl(fun
                               (Elem,AccIn) ->
                                   timer : sleep(6000), %10 measurements per minute
                                   Temp = pmod_nav:read(acc,[out_temp]),
                                   Temp ++ AccIn
                             end,[],lists:seq(1,Len)),
 
-                            Mean = achlys_pmod_nav_worker:get_mean(Sum),
+                            Sum = lists:foldl(fun
+                                (Elem,AccIn) ->
+                                    {_,Temp} = Elem,
+                                    Temp + AccIn
+                                end,0,Buffer),
+
+                            Mean = {Len, (Sum/Len)},
 
                             Name = node(),
                             Pid = self(),
