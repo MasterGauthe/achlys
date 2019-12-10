@@ -42,6 +42,13 @@ println(What) -> io:format("~p~n", [What]).
 average(List) ->
   lists:sum(List) / length(List).
 
+variance(List) ->
+  Mean = average(List),
+  NewList = lists:flatmap(fun(Elem)->
+                              (abs(Elem-Mean))*(abs(Elem-Mean))
+                          end, List),
+  average(NewList).
+
 %%--------------------------------------------------------------------
 %% @doc
 %% Starts the server
@@ -347,18 +354,31 @@ show() ->
               timer : sleep(SampleRate), %10 measurements per minute
               Temp = pmod_nav:read(acc,[out_temp]),
               Temp ++ AccIn
-            end,[],lists:seq(1,5)),
+            end,[],lists:seq(1,Len)),
+
             Name = node(),
             Pid = self(),
 
             case Mode of
+              "current" ->
+                  Current = pmod_nav:read(acc,[out_temp]),
+                  lasp : update (SourceId , {add , {Current , Name}}, Pid ),
+                  println(Min);
               "min" ->
                   Min = lists:min(Buffer),
                   lasp : update (SourceId , {add , {Min , Name}}, Pid ),
                   println(Min);
+              "max" ->
+                  Max = lists:max(Buffer),
+                  lasp : update (SourceId , {add , {Max , Name}}, Pid ),
+                  println(Max);
               "mean" ->
                 Mean = average(Buffer),
                 lasp : update (SourceId , {add , {Mean , Name}}, Pid),
+                println(Mean);
+              "variance" ->
+                Var = variance(Buffer),
+                lasp : update (SourceId , {add , {Var , Name}}, Pid),
                 println(Mean)
             end
 
