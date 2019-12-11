@@ -77,7 +77,7 @@ show() ->
   println(GCountRes0),
   println(EWRes0),
 
-  {ok, {Alpha, _, _, _}} = lasp:declare({<<"best_max">>, state_orset}, state_orset),
+  {ok, {Alpha, _, _, _}} = lasp:declare({<<"best_max">>, state_gset}, state_gset),
   {ok , Sa} = lasp:query(Alpha) ,
   println(sets:to_list(Sa)).
 
@@ -300,7 +300,7 @@ show() ->
     %% executed as long as the node is up
     Task = achlys:declare(task_1
     , all
-    , single
+    , permanent
     , fun() ->
       logger:log(notice, "Reading PmodNAV pressure interval ~n"),
       %Press0 = pmod_nav:read(alt, [press_out]),
@@ -312,41 +312,34 @@ show() ->
 
       EWType = state_ewflag,
       EWVarName = <<"ewvar">>,
+
       GCountType = state_gcounter,
       GCountVarName = <<"gcountvar">>,
 
+      MVMapType = state_mvmap,
+      MVMapVarName = <<"mvmap">>,
+
       {ok, {EW, _, _, _}} = lasp:declare({EWVarName, EWType}, EWType),
       {ok, {GCount, _, _, _}} = lasp:declare({GCountVarName, GCountType}, GCountType),
-
-      {ok, GCountRes0} = lasp:query(GCount),
-      {ok, EWRes0} = lasp:query(EW),
-      println(GCountRes0),
-      println(EWRes0),
+      {ok, {MVMap, _, _, _}} = lasp:declare({MVMapVarName, MVMapType}, MVMapType),
 
       if
-          abs(Press0 - Press1) > Threshold -> {ok, {EW1, _, _, _}} = lasp:update(EW, enable, self()),
-          {ok, {GCount1, _, _, _}} = lasp:update(GCount, increment, self());
+          abs(Press0 - Press1) > Threshold -> lasp:update(MVMap, {set, Node, true}, self());
           %grisp_led : color (1, green );
-          true -> {ok, {EW1, _, _, _}} = lasp:update(EW, disable, self())
+          true -> lasp:update(MVMap, {set, Node, false}, self())
           %grisp_led : color (2, red )
       end,
 
-        F = fun({Press0, Press1, Node}) ->
-          P0 = Press0,
-          P1 = Press1,
-          Delta = abs(P0 - P1),
-          {Delta, Node}
-        end,
 
-        {ok, GCountRes1} = lasp:query(GCount),
-        {ok, EWRes1} = lasp:query(EW),
-        println(GCountRes1),
-        println(EWRes1),
+      {ok, {SourceId, _, _, _}} = lasp:declare({<<"source">>, state_orset}, state_orset),
+      lasp:update(SourceId, {add, {abs(Press0 - Press1), Node}}, self()),
+      {ok, MVMapRes3} = lasp:query(MVMap),
 
-        {ok, {SourceId, _, _, _}} = lasp:declare({<<"source">>, state_orset}, state_orset),
-        {ok, {DestinationId, _, _, _}} = lasp:declare({<<"destination">>, state_orset}, state_orset),
-        lasp:map(SourceId, F, DestinationId),
-        lasp:update(SourceId, {add, {Press0, Press1, Node}}, self())
+      L=[{sets:to_list(V)} || {K, V} <- MVMapRes3],
+      M=[{K, sets:to_list(V)} || {K, V} <- MVMapRes3],
+      println(L),
+      println(M),
+      timer:sleep(6000)
 
     end).
 
@@ -406,8 +399,8 @@ show() ->
             logger:log(notice, "Reading PmodNAV pressure interval ~n"),
             Temp = rand:uniform(100),
             Node = erlang:node(),
-            {ok, {SourceId, _, _, _}} = lasp:declare({<<"source">>, state_orset}, state_orset),
-            {ok, {BestMax, _, _, _}} = lasp:declare({<<"best_max">>, state_orset}, state_orset),
+            {ok, {SourceId, _, _, _}} = lasp:declare({<<"source">>, state_gset}, state_gset),
+            {ok, {BestMax, _, _, _}} = lasp:declare({<<"best_max">>, state_gset}, state_gset),
             {ok, {Count, _, _, _}} = lasp:declare({<<"gcountvar">>, state_gcounter}, state_gcounter),
             {ok , Smax} = lasp:query(BestMax) ,
             {ok, Length} = lasp:query(Count),
@@ -427,8 +420,8 @@ show() ->
 
 
 %%%===================================================================
-
-%% {ok, Set} = lasp:query({<<"source">>, state_orset}), sets:to_list(Set).
+%test:show().
+%% {ok, Set} = lasp:query({<<"source">>, state_gset}), sets:to_list(Set).
 %% {ok, FarenheitSet} = lasp:query({<<"destination">>, state_orset}), sets:to_list(FarenheitSet).
 %% achlys_util:add_node('achlys1@130.104.213.164').
 %% (achlys2@130.104.213.164)3> achlys:get_all_tasks().
