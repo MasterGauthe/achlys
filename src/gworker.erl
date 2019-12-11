@@ -137,17 +137,6 @@ show() ->
     %% Propagates the pmodnav_task
     %% @end
     %%--------------------------------------------------------------------
-    -spec(add_pmodnav_task() ->
-      {ok , Pid :: pid()} | ignore | {error , Reason :: term()}).
-    add_pmodnav_task() ->
-      gen_server:cast(?SERVER
-      , {task, pmodnav_task()}).
-
-    -spec(add_task_1(_Threshold) ->
-      {ok , Pid :: pid()} | ignore | {error , Reason :: term()}).
-    add_task_1(Threshold) ->
-      gen_server:cast(?SERVER
-      , {task, task_1(Threshold)}).
 
     -spec(add_task_exp() ->
       {ok , Pid :: pid()} | ignore | {error , Reason :: term()}).
