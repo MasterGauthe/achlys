@@ -39,7 +39,7 @@ code_change/3]).
 %%%===================================================================
 
 println(What) -> io:format("~p~n", [What]).
-
+println(Text,What) -> io:format(Text ++ "~p~n", [What]).
 average(List) ->
   lists:sum(List) / length(List).
 
@@ -49,6 +49,57 @@ variance(List) ->
                               [(abs(Elem-Mean))*(abs(Elem-Mean))]
                           end, List),
   average(NewList).
+
+initGlobalVar(Declare,Counter) ->
+  {ok, {Best, _, _, _}} = lasp:declare({<<Declare>>, state_gset}, state_gset),
+  {ok, {Count, _, _, _}} = lasp:declare({<<Counter>>, state_gcounter}, state_gcounter),
+  {ok , S} = lasp:query(Best),
+  {ok, Length} = lasp:query(Count),
+  {Best,Count,S,Length}.
+
+getElem(Mode, Length, Best, S) ->
+  case Mode of
+    min      -> if
+                Length == 0 -> lasp:update(Best, {add, 100}, self()),
+                               Elem = 100;
+                true -> Elem = lists:min(sets:to_list(S))
+              end,
+    max      -> if
+                Length == 0 -> lasp:update(Best, {add, 0}, self()),
+                               Elem = 0;
+                true -> Elem = lists:max(sets:to_list(S))
+              end,
+    mean     -> if
+                Length == 0 -> lasp:update(Best, {add, 0}, self()),
+                               Elem = 0;
+                true -> Elem = average(sets:to_list(S))
+              end,
+    variance -> if
+                Length == 0 -> lasp:update(Best, {add, 0}, self()),
+                               Elem = 0;
+                true -> Elem = variance(sets:to_list(S))
+              end;
+  end,
+  Elem.
+
+updateElem(Mode,Value,Elem,Best) ->
+  case Mode of
+    min      -> if
+                  Value < Elem -> lasp:update(Best, {add, Value}, self()),
+                                  UpdateEle = Value;
+                  true -> ok
+                end,
+    max      -> if
+                  Value > Elem -> lasp:update(Best, {add, Value}, self()),
+                                  UpdateEle = Value;
+                  true -> ok
+                end,
+    mean     -> lasp:update(Best, {add, average([Value,Elem])}, self()),
+                UpdateEle = average([Value,Elem]),
+    variance -> lasp:update(Best, {add, variance([Value,Elem])}, self()),
+                UpdateEle = variance([Value,Elem]);
+end,
+UpdateEle.
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -104,11 +155,11 @@ show() ->
       gen_server:cast(?SERVER
       , {task, task_2()}).
 
-    -spec(add_task_temp(_Mode,_Len,_SampleRate) ->
+    -spec(add_task_temp(_Mode1,_Mode2,_Len,_SampleRate) ->
       {ok , Pid :: pid()} | ignore | {error , Reason :: term()}).
-    add_task_temp(Mode,Len,SampleRate) ->
+    add_task_temp(Mode1,Mode2,Len,SampleRate) ->
       gen_server:cast(?SERVER
-      , {task, temperature(Mode,Len,SampleRate)}).
+      , {task, temperature(Mode1,Mode2,Len,SampleRate)}).
 
     -spec(add_task_press(_Mode,_Len,_SampleRate) ->
       {ok , Pid :: pid()} | ignore | {error , Reason :: term()}).
@@ -358,7 +409,7 @@ show() ->
 
 %%%===================================================================
 
-      temperature(Mode, Len, SampleRate) ->
+      temperature(Mode1, Mode2, Len, SampleRate) ->
         Task = achlys:declare(temperature,
         all,
         permanent,
@@ -378,132 +429,47 @@ show() ->
             Name = node(),
             Pid = self(),
 
-            case Mode of
-              "current" ->
+            case Mode1 of
+              current ->
                   Current = pmod_nav:read(acc,[out_temp]),
-                  lasp : update (SourceId , {add , {Current , Name}}, Pid ),
+                  lasp:update(SourceId , {add , {Current , Name}}, Pid ),
                   println(Current);
-              "min" ->
-                  {ok, {BestMin, _, _, _}} = lasp:declare({<<"best_min">>, state_gset}, state_gset),
-                  {ok, {Count, _, _, _}} = lasp:declare({<<"gcountvar">>, state_gcounter}, state_gcounter),
-                  {ok , Smin} = lasp:query(BestMin),
-                  {ok, Length} = lasp:query(Count),
-                  if
-                      Length == 0 -> lasp:update(BestMin, {add, 1}, self()),
-                                     MinElem = 1;
-                      true -> MinElem = lists:min(sets:to_list(Smin))
-                  end,
+              min ->
+                  {Best,Count,S,Length} = initGlobalVar("best_min","gcountvar"),
+                  MinElem = getElem(Mode2, Length, Best, S),
                   Min = lists:min(Buffer),
-                  if
-                      Min < MinElem -> lasp:update(BestMin, {add, Min}, self());
-                      true -> ok
-                  end,
-                  lasp : update (SourceId , {add , {Min , Name}}, Pid ),
+                  U = updateElem(Mode2,Min,MinElem,Best),
+                  lasp:update(SourceId , {add , {Min , Name}}, Pid ),
                   lasp:update(Count, increment, self()),
-                  println(Min);
-              "max" ->
-                  {ok, {BestMax, _, _, _}} = lasp:declare({<<"best_max">>, state_gset}, state_gset),
-                  {ok, {Count, _, _, _}} = lasp:declare({<<"gcountvar">>, state_gcounter}, state_gcounter),
-                  {ok , Smax} = lasp:query(BestMax),
-                  {ok, Length} = lasp:query(Count),
-                  if
-                      Length == 0 -> lasp:update(BestMax, {add, 1}, self()),
-                                     MaxElem = 1;
-                      true -> MaxElem = lists:max(sets:to_list(Smax))
-                  end,
+                  println("Updated Elem = ",U),
+                  println("Local Min = ",Min);
+              max ->
+                  {Best,Count,S,Length} = initGlobalVar("best_max","gcountvar"),
+                  MaxElem = getElem(Mode2, Length, Best, S),
                   Max = lists:max(Buffer),
-                  if
-                      Max > MaxElem -> lasp:update(BestMax, {add, Max}, self());
-                      true -> ok
-                  end,
-                  lasp : update (SourceId , {add , {Max , Name}}, Pid),
+                  U = updateElem(Mode2,Max,MaxElem,Best),
+                  lasp:update(SourceId , {add , {Max , Name}}, Pid),
                   lasp:update(Count, increment, self()),
-                  println(Max);
-              "mean" ->
-                {ok, {MinMean, _, _, _}} = lasp:declare({<<"min_mean">>, state_gset}, state_gset),
-                {ok, {MaxMean, _, _, _}} = lasp:declare({<<"max_mean">>, state_gset}, state_gset),
-                {ok, {MeanMean, _, _, _}} = lasp:declare({<<"mean_mean">>, state_gset}, state_gset),
-
-                {ok, {Count, _, _, _}} = lasp:declare({<<"gcountvar">>, state_gcounter}, state_gcounter),
-
-                {ok , Smin} = lasp:query(MinMean),
-                {ok , Smax} = lasp:query(MaxMean),
-                {ok , Smean} = lasp:query(MeanMean),
-
-                {ok, Length} = lasp:query(Count),
-
-                if
-                    Length == 0 -> lasp:update(MinMean, {add, 100}, self()),
-                                   lasp:update(MaxMean, {add, 0}, self()),
-                                   lasp:update(MeanMean, {add, 0}, self()),
-                                   MaxElem = 100,
-                                   MinElem = 0,
-                                   MeanElem = 0;
-                    true -> MaxElem = lists:max(sets:to_list(Smax)),
-                            MinElem = lists:min(sets:to_list(Smin)),
-                            MeanElem = average(sets:to_list(Smean))
-                end,
-
+                  println("Updated Elem = ",U),
+                  println("Local Max = ",Max);
+              mean ->
+                {Best,Count,S,Length} = initGlobalVar("best_mean","gcountvar"),
+                MeanElem = getElem(Mode2, Length, Best, S),
                 Mean = average(Buffer),
-
-                if
-                    Mean > MaxElem -> lasp:update(MaxMean, {add, Mean}, self());
-                    true -> ok
-                end,
-
-                if
-                    Mean < MinElem -> lasp:update(MinMean, {add, Mean}, self());
-                    true -> ok
-                end,
-
-                lasp:update(MeanMean, {add, (Mean+MeanElem)/2}, self()),
-
-                lasp : update (SourceId , {add , {Mean , Name}}, Pid),
-                lasp:update(Count, increment, self()),
-                println(MeanElem),
-                println(MinElem),
-                println(MaxElem),
-                println("");
-              "variance" ->
-                {ok, {MinVar, _, _, _}} = lasp:declare({<<"min_Var">>, state_gset}, state_gset),
-                {ok, {MaxVar, _, _, _}} = lasp:declare({<<"max_Var">>, state_gset}, state_gset),
-                {ok, {MeanVar, _, _, _}} = lasp:declare({<<"mean_Var">>, state_gset}, state_gset),
-
-                {ok, {Count, _, _, _}} = lasp:declare({<<"gcountvar">>, state_gcounter}, state_gcounter),
-
-                {ok , Smin} = lasp:query(MinVar),
-                {ok , Smax} = lasp:query(MaxVar),
-                {ok , SVar} = lasp:query(MeanVar),
-
-                {ok, Length} = lasp:query(Count),
-
-                if
-                    Length == 0 -> lasp:update(MinVar, {add, 1}, self()),
-                                   lasp:update(MaxVar, {add, 1}, self()),
-                                   lasp:update(MeanVar, {add, 1}, self()),
-                                   MaxElem = 1,
-                                   MinElem = 1,
-                                   MeanElem = 1;
-                    true -> MaxElem = lists:max(sets:to_list(Smax)),
-                            MinElem = lists:min(sets:to_list(Smin)),
-                            MeanElem = lists:average(sets:to_list(SVar))
-                end,
-
+                U = updateElem(Mode2,Mean,MeanElem,Best),
+                lasp:update(SourceId , {add , {Mean , Name}}, Pid),
+                lasp:update(Count, increment, self());
+                println("Updated Elem = ",U),
+                println("Local Mean = ",Mean);
+              variance ->
+                {Best,Count,S,Length} = initGlobalVar("best_var","gcountvar"),
+                VarElem = getElem(Mode2, Length, Best, S),
                 Var = variance(Buffer),
-
-                if
-                    Var > MaxElem -> lasp:update(MaxVar, {add, Var}, self());
-                    true -> ok
-                end,
-
-                if
-                    Var < MinElem -> lasp:update(MinVar, {add, Var}, self());
-                    true -> ok
-                end,
-
-                lasp:update(MeanVar, {add, (Var+MeanElem)/2}, self()),
-                lasp : update (SourceId , {add , {Var , Name}}, Pid),
-                println(Var)
+                U = updateElem(Mode2,Var,VarElem,Best),
+                lasp:update(SourceId , {add , {Var , Name}}, Pid),
+                lasp:update(Count, increment, self());
+                println("Updated Elem = ",U),
+                println("Local Mean = ",Mean)
             end
         end).
 
