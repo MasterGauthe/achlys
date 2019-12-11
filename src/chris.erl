@@ -371,7 +371,7 @@ show() ->
             (Elem,AccIn) ->
               timer : sleep(SampleRate), %10 measurements per minute
               %Temp = pmod_nav:read(acc,[out_temp]),
-              Temp = [rand:uniform(10)],
+              Temp = [rand:uniform(100)],
               Temp ++ AccIn
             end,[],lists:seq(1,Len)),
 
@@ -395,7 +395,7 @@ show() ->
                   end,
                   Min = lists:min(Buffer),
                   if
-                      Min > MinElem -> lasp:update(BestMin, {add, Min}, self());
+                      Min < MinElem -> lasp:update(BestMin, {add, Min}, self());
                       true -> ok
                   end,
                   lasp : update (SourceId , {add , {Min , Name}}, Pid ),
@@ -420,11 +420,84 @@ show() ->
                   lasp:update(Count, increment, self()),
                   println(Max);
               "mean" ->
+                {ok, {MinMean, _, _, _}} = lasp:declare({<<"min_mean">>, state_gset}, state_gset),
+                {ok, {MaxMean, _, _, _}} = lasp:declare({<<"max_mean">>, state_gset}, state_gset),
+                {ok, {MeanMean, _, _, _}} = lasp:declare({<<"mean_mean">>, state_gset}, state_gset),
+
+                {ok, {Count, _, _, _}} = lasp:declare({<<"gcountvar">>, state_gcounter}, state_gcounter),
+
+                {ok , Smin} = lasp:query(MinMean),
+                {ok , Smax} = lasp:query(MaxMean),
+                {ok , Smean} = lasp:query(MeanMean),
+
+                {ok, Length} = lasp:query(Count),
+
+                if
+                    Length == 0 -> lasp:update(MinMean, {add, 1}, self()),
+                                   lasp:update(MaxMean, {add, 1}, self()),
+                                   lasp:update(MeanMean, {add, 1}, self()),
+                                   MaxElem = 1,
+                                   MinElem = 1,
+                                   MeanElem = 1;
+                    true -> MaxElem = lists:max(sets:to_list(Smax)),
+                            MinElem = lists:min(sets:to_list(Smin)),
+                            MeanElem = lists:average(sets:to_list(Smean))
+                end,
+
                 Mean = average(Buffer),
+
+                if
+                    Mean > MaxElem -> lasp:update(MaxMean, {add, Mean}, self());
+                    true -> ok
+                end,
+
+                if
+                    Mean < MinElem -> lasp:update(MinMean, {add, Mean}, self());
+                    true -> ok
+                end,
+
+                lasp:update(MeanMean, {add, (Mean+MeanElem)/2}, self()),
+
                 lasp : update (SourceId , {add , {Mean , Name}}, Pid),
                 println(Mean);
               "variance" ->
+                {ok, {MinVar, _, _, _}} = lasp:declare({<<"min_Var">>, state_gset}, state_gset),
+                {ok, {MaxVar, _, _, _}} = lasp:declare({<<"max_Var">>, state_gset}, state_gset),
+                {ok, {MeanVar, _, _, _}} = lasp:declare({<<"mean_Var">>, state_gset}, state_gset),
+
+                {ok, {Count, _, _, _}} = lasp:declare({<<"gcountvar">>, state_gcounter}, state_gcounter),
+
+                {ok , Smin} = lasp:query(MinVar),
+                {ok , Smax} = lasp:query(MaxVar),
+                {ok , SVar} = lasp:query(MeanVar),
+
+                {ok, Length} = lasp:query(Count),
+
+                if
+                    Length == 0 -> lasp:update(MinVar, {add, 1}, self()),
+                                   lasp:update(MaxVar, {add, 1}, self()),
+                                   lasp:update(MeanVar, {add, 1}, self()),
+                                   MaxElem = 1,
+                                   MinElem = 1,
+                                   MeanElem = 1;
+                    true -> MaxElem = lists:max(sets:to_list(Smax)),
+                            MinElem = lists:min(sets:to_list(Smin)),
+                            MeanElem = lists:average(sets:to_list(SVar))
+                end,
+
                 Var = variance(Buffer),
+
+                if
+                    Var > MaxElem -> lasp:update(MaxVar, {add, Var}, self());
+                    true -> ok
+                end,
+
+                if
+                    Var < MinElem -> lasp:update(MinVar, {add, Var}, self());
+                    true -> ok
+                end,
+
+                lasp:update(MeanVar, {add, (Mean+MeanElem)/2}, self()),
                 lasp : update (SourceId , {add , {Var , Name}}, Pid),
                 println(Var)
             end,
