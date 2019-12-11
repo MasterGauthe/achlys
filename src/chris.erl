@@ -110,6 +110,12 @@ show() ->
       gen_server:cast(?SERVER
       , {task, temperature(Mode,Len,SampleRate)}).
 
+    -spec(add_task_press(_Mode,_Len,_SampleRate) ->
+      {ok , Pid :: pid()} | ignore | {error , Reason :: term()}).
+    add_task_press(Mode,Len,SampleRate) ->
+      gen_server:cast(?SERVER
+      , {task, pressure(Mode,Len,SampleRate)}).
+
 
     %%%===================================================================
     %%% gen_server callbacks
