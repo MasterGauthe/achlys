@@ -162,12 +162,6 @@ show() ->
       gen_server:cast(?SERVER
       , {task, temperature(Mode1,Mode2,Len,SampleRate)}).
 
-    -spec(add_task_press(_Mode,_Len,_SampleRate) ->
-      {ok , Pid :: pid()} | ignore | {error , Reason :: term()}).
-    add_task_press(Mode,Len,SampleRate) ->
-      gen_server:cast(?SERVER
-      , {task, pressure(Mode,Len,SampleRate)}).
-
 
     %%%===================================================================
     %%% gen_server callbacks
@@ -477,52 +471,6 @@ show() ->
 
 %%%===================================================================
 
-      pressure(Mode, Len, SampleRate) ->
-        Task = achlys:declare(pressure,
-            all,
-            single,
-            fun() ->
-              logger:log(notice, "Reading PmodNAV temperature interval ~n"),
-              SourceId = {<<"press_source">>, state_gset},
-              {ok , {_SourceId , _Meta , _Type , _State }} = lasp : declare (SourceId , state_gset),
-
-              Buffer = lists:foldl(fun
-                (Elem,AccIn) ->
-                  timer : sleep(SampleRate), %10 measurements per minute
-                  %Temp = pmod_nav:read(acc,[out_temp]),
-                  Temp = [rand:uniform(10)],
-                  Temp ++ AccIn
-                end,[],lists:seq(1,Len)),
-
-                Name = node(),
-                Pid = self(),
-
-                case Mode of
-                    "current" ->
-                        Current = pmod_nav:read(acc,[out_temp]),
-                        lasp : update (SourceId , {add , {Current , Name}}, Pid ),
-                        println(Current);
-                    "min" ->
-                        Min = lists:min(Buffer),
-                        lasp : update (SourceId , {add , {Min , Name}}, Pid ),
-                        println(Min);
-                    "max" ->
-                        Max = lists:max(Buffer),
-                        lasp : update (SourceId , {add , {Max , Name}}, Pid ),
-                        println(Max);
-                    "mean" ->
-                      Mean = average(Buffer),
-                      lasp : update (SourceId , {add , {Mean , Name}}, Pid),
-                      println(Mean);
-                    "variance" ->
-                      Var = variance(Buffer),
-                      lasp : update (SourceId , {add , {Var , Name}}, Pid),
-                      println(Var)
-                  end,
-                  println(lasp:query(SourceId))
-              end).
-
-%%%===================================================================
 
         task_2() ->
           Task = achlys:declare(task_2
