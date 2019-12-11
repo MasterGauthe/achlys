@@ -80,7 +80,7 @@ getElem(Mode, Length, Best, S) ->
                 true -> Elem = variance(sets:to_list(S))
               end
   end,
-  {Elem}.
+  Elem.
 
 updateElem(Mode,Value,Elem,Best) ->
   case Mode of
@@ -465,7 +465,8 @@ show() ->
                 lasp:update(Count, increment, self()),
                 println("Updated Elem = ",U),
                 println("Local Var = ",Var)
-            end
+            end,
+            println(" ")
         end).
 
 
