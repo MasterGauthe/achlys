@@ -6,7 +6,7 @@
 %%% model API.
 %%% @end
 %%%-------------------------------------------------------------------
--module(test).
+-module(chris).
 -author("Igor Kopestenski").
 
 -behaviour(gen_server).
@@ -359,9 +359,9 @@ show() ->
 %%%===================================================================
 
       temperature(Mode, Len, SampleRate) ->
-        Task = achlys:declare(temp_task,
+        Task = achlys:declare(temperature,
         all,
-        single,
+        permanent,
         fun() ->
           logger:log(notice, "Reading PmodNAV temperature interval ~n"),
           SourceId = {<<"temp_source">>, state_gset},
@@ -433,15 +433,15 @@ show() ->
                 {ok, Length} = lasp:query(Count),
 
                 if
-                    Length == 0 -> lasp:update(MinMean, {add, 1}, self()),
-                                   lasp:update(MaxMean, {add, 1}, self()),
-                                   lasp:update(MeanMean, {add, 1}, self()),
-                                   MaxElem = 1,
-                                   MinElem = 1,
-                                   MeanElem = 1;
+                    Length == 0 -> lasp:update(MinMean, {add, 100}, self()),
+                                   lasp:update(MaxMean, {add, 0}, self()),
+                                   lasp:update(MeanMean, {add, 0}, self()),
+                                   MaxElem = 100,
+                                   MinElem = 0,
+                                   MeanElem = 0;
                     true -> MaxElem = lists:max(sets:to_list(Smax)),
                             MinElem = lists:min(sets:to_list(Smin)),
-                            MeanElem = lists:average(sets:to_list(Smean))
+                            MeanElem = average(sets:to_list(Smean))
                 end,
 
                 Mean = average(Buffer),
@@ -459,7 +459,11 @@ show() ->
                 lasp:update(MeanMean, {add, (Mean+MeanElem)/2}, self()),
 
                 lasp : update (SourceId , {add , {Mean , Name}}, Pid),
-                println(Mean);
+                lasp:update(Count, increment, self()),
+                println(MeanElem),
+                println(MinElem),
+                println(MaxElem),
+                println("");
               "variance" ->
                 {ok, {MinVar, _, _, _}} = lasp:declare({<<"min_Var">>, state_gset}, state_gset),
                 {ok, {MaxVar, _, _, _}} = lasp:declare({<<"max_Var">>, state_gset}, state_gset),
@@ -497,18 +501,17 @@ show() ->
                     true -> ok
                 end,
 
-                lasp:update(MeanVar, {add, (Mean+MeanElem)/2}, self()),
+                lasp:update(MeanVar, {add, (Var+MeanElem)/2}, self()),
                 lasp : update (SourceId , {add , {Var , Name}}, Pid),
                 println(Var)
-            end,
-            println(lasp:query(SourceId))
+            end
         end).
 
 
 %%%===================================================================
 
       pressure(Mode, Len, SampleRate) ->
-        Task = achlys:declare(temp_task,
+        Task = achlys:declare(pressure,
             all,
             single,
             fun() ->
