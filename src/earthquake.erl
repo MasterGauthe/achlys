@@ -6,7 +6,7 @@
 %%% model API.
 %%% @end
 %%%-------------------------------------------------------------------
--module(test).
+-module(earthquake).
 -author("Igor Kopestenski").
 
 -behaviour(gen_server).
@@ -16,11 +16,7 @@
 
 %% Adds the pmodnav_task to the working set
 %% using the Achlys task model
--export([add_pmodnav_task/0,
-show/0,
-add_task_1/1,
-add_task_2/0,
-add_task_temp/3]).
+-export([add_task_1/1]).
 
 %% gen_server callbacks
 -export([init/1 ,
@@ -40,16 +36,6 @@ code_change/3]).
 
 println(What) -> io:format("~p~n", [What]).
 
-average(List) ->
-  lists:sum(List) / length(List).
-
-variance(List) ->
-  Mean = average(List),
-  NewList = lists:flatmap(fun(Elem)->
-                              [(abs(Elem-Mean))*(abs(Elem-Mean))]
-                          end, List),
-  average(NewList).
-
 %%--------------------------------------------------------------------
 %% @doc
 %% Starts the server
@@ -61,55 +47,17 @@ variance(List) ->
 start_link() ->
   gen_server:start_link({local , ?SERVER} , ?MODULE , [] , []).
 
--spec(show() ->
-  {ok , Pid :: pid()} | ignore | {error , Reason :: term()}).
-show() ->
-  EWType = state_ewflag,
-  EWVarName = <<"ewvar">>,
-  GCountType = state_gcounter,
-  GCountVarName = <<"gcountvar">>,
-
-  {ok, {GCount, _, _, _}} = lasp:declare({GCountVarName, GCountType}, GCountType),
-  {ok, GCountRes0} = lasp:query(GCount),
-  {ok, {EW, _, _, _}} = lasp:declare({EWVarName, EWType}, EWType),
-  {ok, EWRes0} = lasp:query(EW),
-
-  println(GCountRes0),
-  println(EWRes0),
-
-  {ok, {Alpha, _, _, _}} = lasp:declare({<<"best_max">>, state_gset}, state_gset),
-  {ok , Sa} = lasp:query(Alpha) ,
-  println(sets:to_list(Sa)).
-
     %%--------------------------------------------------------------------
     %% @doc
     %% Propagates the pmodnav_task
     %% @end
     %%--------------------------------------------------------------------
-    -spec(add_pmodnav_task() ->
-      {ok , Pid :: pid()} | ignore | {error , Reason :: term()}).
-    add_pmodnav_task() ->
-      gen_server:cast(?SERVER
-      , {task, pmodnav_task()}).
 
     -spec(add_task_1(_Threshold) ->
       {ok , Pid :: pid()} | ignore | {error , Reason :: term()}).
     add_task_1(Threshold) ->
       gen_server:cast(?SERVER
       , {task, task_1(Threshold)}).
-
-    -spec(add_task_2() ->
-      {ok , Pid :: pid()} | ignore | {error , Reason :: term()}).
-    add_task_2() ->
-      gen_server:cast(?SERVER
-      , {task, task_2()}).
-
-    -spec(add_task_temp(_Mode,_Len,_SampleRate) ->
-      {ok , Pid :: pid()} | ignore | {error , Reason :: term()}).
-    add_task_temp(Mode,Len,SampleRate) ->
-      gen_server:cast(?SERVER
-      , {task, temp(Mode,Len,SampleRate)}).
-
 
     %%%===================================================================
     %%% gen_server callbacks
@@ -264,37 +212,6 @@ show() ->
 
   %%%===================================================================
 
-  %% https://github.com/grisp/grisp/wiki/PmodNAV-Tutorial
-  pmodnav_task() ->
-    %% Declare an Achlys task that will be periodically
-    %% executed as long as the node is up
-    Task = achlys:declare(pmodnav_task
-    , all
-    , single
-    , fun() ->
-      logger:log(notice, "Reading PmodNAV measurements ~n"),
-      Acc = pmod_nav:read(acc, [out_x_xl, out_y_xl, out_z_xl]),
-      Gyro = pmod_nav:read(acc, [out_x_g, out_y_g, out_z_g]),
-      Mag = pmod_nav:read(mag, [out_x_m, out_y_m, out_z_m]),
-      Press = pmod_nav:read(alt, [press_out]),
-      Temp = pmod_nav:read(alt, [temp_out]),
-      Node = erlang:node(),
-
-      F = fun({Acc, Gyro, Mag, Press, Temp, Node}) ->
-        [T] = Temp,
-        NewTemp = ((T * 1.8) + 32),
-        {Acc, Gyro, Mag, Press, [NewTemp], Node}
-      end,
-      %% {ok, Set} = lasp:query({<<"source">>, state_orset}), sets:to_list(Set).
-      %% {ok, FarenheitSet} = lasp:query({<<"destination">>, state_orset}), sets:to_list(FarenheitSet).
-      {ok, {SourceId, _, _, _}} = lasp:declare({<<"source">>, state_orset}, state_orset),
-      {ok, {DestinationId, _, _, _}} = lasp:declare({<<"destination">>, state_orset}, state_orset),
-      lasp:map(SourceId, F, DestinationId),
-      lasp:update(SourceId, {add, {Acc, Gyro, Mag, Press, Temp, Node}}, self())
-    end).
-
-  %%%===================================================================
-
   task_1(Threshold) ->
     %% Declare an Achlys task that will be periodically
     %% executed as long as the node is up
@@ -312,114 +229,47 @@ show() ->
 
       EWType = state_ewflag,
       EWVarName = <<"ewvar">>,
-
-      GCountType = state_gcounter,
-      GCountVarName = <<"gcountvar">>,
-
-      MVMapType = state_mvmap,
-      MVMapVarName = <<"mvmap">>,
+      ORSetType = state_orset,
+      ORSetVarName = <<"orset">>,
 
       {ok, {EW, _, _, _}} = lasp:declare({EWVarName, EWType}, EWType),
-      {ok, {GCount, _, _, _}} = lasp:declare({GCountVarName, GCountType}, GCountType),
-      {ok, {MVMap, _, _, _}} = lasp:declare({MVMapVarName, MVMapType}, MVMapType),
-
+      {ok, {ORSetA, _, _, _}} = lasp:declare({<<"orseta">>, ORSetType}, ORSetType),
+      {ok, {ORSetB, _, _, _}} = lasp:declare({<<"orsetb">>, ORSetType}, ORSetType),
       if
-          abs(Press0 - Press1) > Threshold -> lasp:update(MVMap, {set, Node, true}, self());
+          abs(Press0 - Press1) > Threshold -> lasp:update(ORSetA, {add, Node}, self()),
+          lasp:update(ORSetB, {add, Node}, self());
           %grisp_led : color (1, green );
-          true -> lasp:update(MVMap, {set, Node, false}, self())
+          true -> lasp:update(ORSetA, {rmv, Node}, self())
           %grisp_led : color (2, red )
       end,
-
-
-      {ok, {SourceId, _, _, _}} = lasp:declare({<<"source">>, state_orset}, state_orset),
-      lasp:update(SourceId, {add, {abs(Press0 - Press1), Node}}, self()),
-      {ok, MVMapRes3} = lasp:query(MVMap),
-
-      L=[{sets:to_list(V)} || {K, V} <- MVMapRes3],
-      M=[{K, sets:to_list(V)} || {K, V} <- MVMapRes3],
-      println(L),
-      println(M),
-      timer:sleep(6000)
-
+      {ok, ORSet0} = lasp:query(ORSetA),
+      {ok, ORSet1} = lasp:query(ORSetB),
+      L1 = length(sets:to_list(ORSet0)),
+      L2 = length(sets:to_list(ORSet1)),
+      if
+          (L2 == L1) and (L1 > 0) -> lasp:update(EW, enable, self());
+          true -> lasp:update(EW, disable, self())
+      end,
+      %{ok, {SourceId, _, _, _}} = lasp:declare({<<"source">>, state_orset}, state_orset),
+      %lasp:update(SourceId, {add, {abs(Press0 - Press1), Node}}, self()),
+      {ok, EW0} = lasp:query(EW),
+      println(sets:to_list(ORSet0)),
+      println(sets:to_list(ORSet1)),
+      println(EW0),
+      println(" "),
+      timer:sleep(3000)
     end).
 
 %%%===================================================================
 
-      temp(Mode, Len, SampleRate) ->
-        Task = achlys:declare(temp_task,
-        all,
-        single,
-        fun() ->
-          SourceId = {<<"temp">>, state_gset},
-          {ok , {_SourceId , _Meta , _Type , _State }} = lasp : declare (SourceId , state_gset),
+%%logger:log(notice, "Reading PmodNAV measurements ~n"),
+%%Acc = pmod_nav:read(acc, [out_x_xl, out_y_xl, out_z_xl]),
+%%Gyro = pmod_nav:read(acc, [out_x_g, out_y_g, out_z_g]),
+%%Mag = pmod_nav:read(mag, [out_x_m, out_y_m, out_z_m]),
+%%Press = pmod_nav:read(alt, [press_out]),
+%%Temp = pmod_nav:read(alt, [temp_out]),
+%%Node = erlang:node(),
 
-          Buffer = lists:foldl(fun
-            (Elem,AccIn) ->
-              timer : sleep(SampleRate), %10 measurements per minute
-              %Temp = pmod_nav:read(acc,[out_temp]),
-              Temp = [rand:uniform(10)],
-              Temp ++ AccIn
-            end,[],lists:seq(1,Len)),
-
-            Name = node(),
-            Pid = self(),
-
-            case Mode of
-              "current" ->
-                  Current = pmod_nav:read(acc,[out_temp]),
-                  lasp : update (SourceId , {add , {Current , Name}}, Pid ),
-                  println(Current);
-              "min" ->
-                  Min = lists:min(Buffer),
-                  lasp : update (SourceId , {add , {Min , Name}}, Pid ),
-                  println(Min);
-              "max" ->
-                  Max = lists:max(Buffer),
-                  lasp : update (SourceId , {add , {Max , Name}}, Pid ),
-                  println(Max);
-              "mean" ->
-                Mean = average(Buffer),
-                lasp : update (SourceId , {add , {Mean , Name}}, Pid),
-                println(Mean);
-              "variance" ->
-                Var = variance(Buffer),
-                lasp : update (SourceId , {add , {Var , Name}}, Pid),
-                println(Var)
-            end,
-            println(lasp:query(SourceId))
-          end).
-
-%%%===================================================================
-
-        task_2() ->
-          Task = achlys:declare(task_2
-          , all
-          , permanent
-          , fun() ->
-            logger:log(notice, "Reading PmodNAV pressure interval ~n"),
-            Temp = rand:uniform(100),
-            Node = erlang:node(),
-            {ok, {SourceId, _, _, _}} = lasp:declare({<<"source">>, state_gset}, state_gset),
-            {ok, {BestMax, _, _, _}} = lasp:declare({<<"best_max">>, state_gset}, state_gset),
-            {ok, {Count, _, _, _}} = lasp:declare({<<"gcountvar">>, state_gcounter}, state_gcounter),
-            {ok , Smax} = lasp:query(BestMax) ,
-            {ok, Length} = lasp:query(Count),
-            if
-                Length == 0 -> lasp:update(BestMax, {add, 1}, self()),
-                Max = 1;
-                true -> Max = lists:max(sets:to_list(Smax))
-            end,
-            println(Max),
-            if
-                Temp > Max -> lasp:update(BestMax, {add, Temp}, self());
-                true -> ok
-            end,
-            lasp:update(SourceId, {add, {Temp, Node}}, self()),
-            lasp:update(Count, increment, self())
-          end).
-
-
-%%%===================================================================
 %test:show().
 %% {ok, Set} = lasp:query({<<"source">>, state_gset}), sets:to_list(Set).
 %% {ok, FarenheitSet} = lasp:query({<<"destination">>, state_orset}), sets:to_list(FarenheitSet).
