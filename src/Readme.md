@@ -1,5 +1,5 @@
 # Documentation
-##Disclamer
+## Disclamer
 
 For now the value from the sensors are random value but you can have the real one by uncommenting the upper code line.
 
