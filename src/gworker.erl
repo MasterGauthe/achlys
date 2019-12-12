@@ -17,8 +17,8 @@
 %% Adds the pmodnav_task to the working set
 %% using the Achlys task model
 -export([add_task_exp/0,
-        add_task_press/4,
-        add_task_temp/4]).
+        add_task_press/6,
+        add_task_temp/6]).
 
 %% gen_server callbacks
 -export([init/1 ,
@@ -323,13 +323,15 @@ show() ->
         (Elem,AccIn) ->
           timer : sleep(SampleRate), %10 measurements per minute
           %Temp = pmod_nav:read(acc,[out_temp]),
-          Temp = [rand:uniform(100)],
+          Temp = rand:uniform(100),
           if
             Temp < UB ->
               if
-                Temp > LB -> Temp ++ AccIn
-              end
-          end,
+                Temp > LB -> [Temp] ++ AccIn;
+                true -> [LB]
+              end;
+            true->[UB]
+          end
         end,[],lists:seq(1,Len)),
 
         Name = node(),
@@ -395,13 +397,15 @@ pressure(Mode1, Mode2, Len, SampleRate,LB,UB) ->
       (Elem,AccIn) ->
         timer : sleep(SampleRate), %10 measurements per minute
         %Temp = pmod_nav:read(acc,[press_out]),
-        Press = [rand:uniform(100)],
+        Press = rand:uniform(100),
         if
           Press < UB ->
             if
-              Press > LB -> Press ++ AccIn
-            end
-        end,
+              Press > LB -> [Press] ++ AccIn;
+              true -> [LB]
+            end;
+          true->[UB]
+        end
       end,[],lists:seq(1,Len)),
 
       Name = node(),
