@@ -7,7 +7,7 @@
 %%% @end
 %%%-------------------------------------------------------------------
 -module(earthquake).
--author("Igor Kopestenski").
+-author("Crochet Christophe, Van Vracem Gauthier").
 
 -behaviour(gen_server).
 

@@ -144,17 +144,17 @@ show() ->
       gen_server:cast(?SERVER
       , {task, task_exp()}).
 
-    -spec(add_task_temp(_Mode1,_Mode2,_Len,_SampleRate) ->
+    -spec(add_task_temp(_Mode1,_Mode2,_Len,_SampleRate,_LB,_UB) ->
       {ok , Pid :: pid()} | ignore | {error , Reason :: term()}).
-    add_task_temp(Mode1,Mode2,Len,SampleRate) ->
+    add_task_temp(Mode1,Mode2,Len,SampleRate,LB,UB) ->
       gen_server:cast(?SERVER
-      , {task, temperature(Mode1,Mode2,Len,SampleRate)}).
+      , {task, temperature(Mode1,Mode2,Len,SampleRate,LB,UB)}).
 
-    -spec(add_task_press(_Mode1,_Mode2,_Len,_SampleRate) ->
+    -spec(add_task_press(_Mode1,_Mode2,_Len,_SampleRate,_LB,_UB) ->
       {ok , Pid :: pid()} | ignore | {error , Reason :: term()}).
-    add_task_press(Mode1,Mode2,Len,SampleRate) ->
+    add_task_press(Mode1,Mode2,Len,SampleRate,LB,UB) ->
       gen_server:cast(?SERVER
-      , {task, pressure(Mode1,Mode2,Len,SampleRate)}).
+      , {task, pressure(Mode1,Mode2,Len,SampleRate,LB,UB)}).
 
 
     %%%===================================================================
@@ -310,7 +310,7 @@ show() ->
 
   %%%===================================================================
 
-  temperature(Mode1, Mode2, Len, SampleRate) ->
+  temperature(Mode1, Mode2, Len, SampleRate,LB,UB) ->
     Task = achlys:declare(temperature,
     all,
     permanent,
@@ -324,7 +324,12 @@ show() ->
           timer : sleep(SampleRate), %10 measurements per minute
           %Temp = pmod_nav:read(acc,[out_temp]),
           Temp = [rand:uniform(100)],
-          Temp ++ AccIn
+          if
+            Temp < UB ->
+              if
+                Temp > LB -> Temp ++ AccIn
+              end
+          end,
         end,[],lists:seq(1,Len)),
 
         Name = node(),
@@ -377,7 +382,7 @@ show() ->
 
 %%%===================================================================
 
-pressure(Mode1, Mode2, Len, SampleRate) ->
+pressure(Mode1, Mode2, Len, SampleRate,LB,UB) ->
   Task = achlys:declare(temperature,
   all,
   permanent,
@@ -390,8 +395,13 @@ pressure(Mode1, Mode2, Len, SampleRate) ->
       (Elem,AccIn) ->
         timer : sleep(SampleRate), %10 measurements per minute
         %Temp = pmod_nav:read(acc,[press_out]),
-        Temp = [rand:uniform(100)],
-        Temp ++ AccIn
+        Press = [rand:uniform(100)],
+        if
+          Press < UB ->
+            if
+              Press > LB -> Press ++ AccIn
+            end
+        end,
       end,[],lists:seq(1,Len)),
 
       Name = node(),
