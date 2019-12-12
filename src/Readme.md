@@ -1,5 +1,14 @@
 # Documentation
+##Disclamer
+
+For now the value from the sensors are random value but you can have the real one by uncommenting the upper code line.
+
 ## gworker
+
+When selected {temperature,pressure} task, you can with the arguments Mode1 and Mode2 compute one of the measure combine with another one. 
+
+For example you can compute the global average of the minimum temperature with a local buffer of 5,where there is 1000 ms between each sensors activation and where there is a lower bound and upper bound for temperature value, between all the mote with the same task with the command : 
+- gworker:add_task_temp(min,mean,5,1000,-80,100). 
 
 <p align="center">
   <img src="resources/presentation_gworker.jpg" alt="EDoc"/>
