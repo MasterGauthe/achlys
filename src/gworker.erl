@@ -39,9 +39,11 @@
 println(What) -> io:format("~p~n", [What]).
 println(Text,What) -> io:format(Text ++ "~p~n", [What]).
 
+%return the average of a list
 average(List) ->
   lists:sum(List) / length(List).
 
+%return the variance of a list
 variance(List) ->
   Mean = average(List),
   NewList = lists:flatmap(fun(Elem)->
@@ -49,6 +51,12 @@ variance(List) ->
                           end, List),
   average(NewList).
 
+%Initializes lasp's variables : global best value and global counter
+%return :
+% - Best  = global lasp set "best"
+% - Count = global lasp counter "gcountvar"
+% - S     = Set of Best
+% - Length= length of set S
 initGlobalVar(Set) ->
   {ok, {Best, _, _, _}} = lasp:declare({<<"best">>, Set}, Set),
   {ok, {Count, _, _, _}} = lasp:declare({<<"gcountvar">>, state_gcounter}, state_gcounter),
@@ -56,6 +64,7 @@ initGlobalVar(Set) ->
   {ok, Length} = lasp:query(Count),
   {Best,Count,S,Length}.
 
+%return of the Best set value that satisfy the Mode
 getElem(Mode, Length, Best, S) ->
   case Mode of
     min      -> if
@@ -81,6 +90,8 @@ getElem(Mode, Length, Best, S) ->
   end,
   Elem.
 
+%update the global var lasp if the local variable is better than the global
+%one
 updateElem(Mode,Value,Elem,Best) ->
   case Mode of
     min      -> if
@@ -309,6 +320,8 @@ show() ->
     ok.
 
   %%%===================================================================
+  % Task about temperature measurements
+  %%%===================================================================
 
   temperature(Mode1, Mode2, Len, SampleRate,LB,UB) ->
     Task = achlys:declare(temperature,
@@ -330,7 +343,7 @@ show() ->
                 Temp > LB -> [Temp] ++ AccIn;
                 true -> [LB]
               end;
-            true->[UB]
+            true -> [UB]
           end
         end,[],lists:seq(1,Len)),
 
@@ -339,8 +352,12 @@ show() ->
 
         case Mode1 of
           current ->
+              {Best,Count,S,Length} = initGlobalVar(state_gset),
+              CurrentElem = getElem(Mode2, Length, Best, S),
               Current = pmod_nav:read(acc,[out_temp]),
+              U = updateElem(Mode2,Current,CurrentElem,Best),
               lasp:update(SourceId , {add , {Current , Name}}, Pid),
+              lasp:update(Count, increment, self()),
               println(Current);
           min ->
               {Best,Count,S,Length} = initGlobalVar(state_gset),
@@ -383,6 +400,8 @@ show() ->
       end).
 
 %%%===================================================================
+% Task about pressure measurements
+%%%===================================================================
 
 pressure(Mode1, Mode2, Len, SampleRate,LB,UB) ->
   Task = achlys:declare(temperature,
@@ -404,7 +423,7 @@ pressure(Mode1, Mode2, Len, SampleRate,LB,UB) ->
               Press > LB -> [Press] ++ AccIn;
               true -> [LB]
             end;
-          true->[UB]
+          true -> [UB]
         end
       end,[],lists:seq(1,Len)),
 
@@ -413,8 +432,12 @@ pressure(Mode1, Mode2, Len, SampleRate,LB,UB) ->
 
       case Mode1 of
         current ->
-            Current = pmod_nav:read(acc,[press_out]),
+            {Best,Count,S,Length} = initGlobalVar(state_gset),
+            CurrentElem = getElem(Mode2, Length, Best, S),
+            Current = pmod_nav:read(acc,[out_press]),
+            U = updateElem(Mode2,Current,CurrentElem,Best),
             lasp:update(SourceId , {add , {Current , Name}}, Pid),
+            lasp:update(Count, increment, self()),
             println(Current);
         min ->
             {Best,Count,S,Length} = initGlobalVar(state_gset),
@@ -458,6 +481,8 @@ pressure(Mode1, Mode2, Len, SampleRate,LB,UB) ->
 
 
 %%%===================================================================
+% Exemple Task
+%%%===================================================================
 
     task_exp() ->
       Task = achlys:declare(task_exp
@@ -487,6 +512,8 @@ pressure(Mode1, Mode2, Len, SampleRate,LB,UB) ->
     end).
 
 
+%%%===================================================================
+% Set of useful command
 %%%===================================================================
 
 %% {ok, Set} = lasp:query({<<"source">>, state_orset}), sets:to_list(Set).
