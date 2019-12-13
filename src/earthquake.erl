@@ -1,24 +1,13 @@
-%%%-------------------------------------------------------------------
-%%% @author Igor Kopestenski
-%%% 2019, <UCLouvain>
-%%% @doc
-%%% Sample generic server demonstrating usage of the Achlys task
-%%% model API.
-%%% @end
-%%%-------------------------------------------------------------------
 -module(earthquake).
--author("Crochet Christophe, Van Vracem Gauthier").
+
+-author("Gauthier VAN VRACEM, Christophe CROCHET").
 
 -behaviour(gen_server).
 
-%% API
 -export([start_link/0]).
 
-%% Adds the pmodnav_task to the working set
-%% using the Achlys task model
--export([add_task_1/1]).
+-export([show/0]).
 
-%% gen_server callbacks
 -export([init/1 ,
 handle_call/3 ,
 handle_cast/2 ,
@@ -31,247 +20,176 @@ code_change/3]).
 -record(state , {}).
 
 %%%===================================================================
-%%% API
+%%% Default achlys functions
 %%%===================================================================
 
-println(What) -> io:format("~p~n", [What]).
-
-%%--------------------------------------------------------------------
-%% @doc
-%% Starts the server
-%%
-%% @end
-%%--------------------------------------------------------------------
--spec(start_link() ->
-  {ok , Pid :: pid()} | ignore | {error , Reason :: term()}).
 start_link() ->
   gen_server:start_link({local , ?SERVER} , ?MODULE , [] , []).
 
-    %%--------------------------------------------------------------------
-    %% @doc
-    %% Propagates the pmodnav_task
-    %% @end
-    %%--------------------------------------------------------------------
+init([]) ->
+  ok = task_1(3),
+  logger:log(critical, "Running provider ~n"),
+  {ok , #state{}}.
 
-    -spec(add_task_1(_Threshold) ->
-      {ok , Pid :: pid()} | ignore | {error , Reason :: term()}).
-    add_task_1(Threshold) ->
-      gen_server:cast(?SERVER
-      , {task, task_1(Threshold)}).
+handle_call(_Request , _From , State) ->
+  {reply , ok , State}.
 
-    %%%===================================================================
-    %%% gen_server callbacks
-    %%%===================================================================
+handle_cast({task, Task} , State) ->
+  logger:log(critical, "Received task cast signal ~n"),
+  achlys:bite(Task),
+  {noreply , State};
+handle_cast(_Request , State) ->
+  {noreply , State}.
 
-    %%--------------------------------------------------------------------
-    %% @private
-    %% @doc
-    %% Initializes the server
-    %%
-    %% @spec init(Args) -> {ok, State} |
-    %%                     {ok, State, Timeout} |
-    %%                     ignore |
-    %%                     {stop, Reason}
-    %% @end
-    %%--------------------------------------------------------------------
-    -spec(init(Args :: term()) ->
-      {ok , State :: #state{}} | {ok , State :: #state{} , timeout() | hibernate} |
-      {stop , Reason :: term()} | ignore).
-    init([]) ->
-      ok = loop_schedule_task(1, 200),
-      logger:log(critical, "Running provider ~n"),
-      {ok , #state{}}.
+handle_info({task, Task} , State) ->
+  logger:log(critical, "Received task signal ~n"),
+  achlys:bite(Task),
+  {noreply , State};
+handle_info(_Info , State) ->
+  {noreply , State}.
 
-    %%--------------------------------------------------------------------
-    %% @private
-    %% @doc
-    %% Handling call messages
-    %%
-    %% @end
-    %%--------------------------------------------------------------------
-    -spec(handle_call(Request :: term() , From :: {pid() , Tag :: term()} ,
-    State :: #state{}) ->
-      {reply , Reply :: term() , NewState :: #state{}} |
-      {reply , Reply :: term() , NewState :: #state{} , timeout() | hibernate} |
-      {noreply , NewState :: #state{}} |
-      {noreply , NewState :: #state{} , timeout() | hibernate} |
-      {stop , Reason :: term() , Reply :: term() , NewState :: #state{}} |
-      {stop , Reason :: term() , NewState :: #state{}}).
-    handle_call(_Request , _From , State) ->
-      {reply , ok , State}.
-
-    %%--------------------------------------------------------------------
-    %% @private
-    %% @doc
-    %% Handling cast messages
-    %%
-    %% @end
-    %%--------------------------------------------------------------------
-    -spec(handle_cast(Request :: term() , State :: #state{}) ->
-      {noreply , NewState :: #state{}} |
-      {noreply , NewState :: #state{} , timeout() | hibernate} |
-      {stop , Reason :: term() , NewState :: #state{}}).
-    handle_cast({task, Task} , State) ->
-      logger:log(critical, "Received task cast signal ~n"),
-      %% Task propagation to the cluster, including self
-      achlys:bite(Task),
-      {noreply , State};
-    handle_cast(_Request , State) ->
-      {noreply , State}.
-
-    %%--------------------------------------------------------------------
-    %% @private
-    %% @doc
-    %% Handling all non call/cast messages
-    %%
-    %% @spec handle_info(Info, State) -> {noreply, State} |
-    %%                                   {noreply, State, Timeout} |
-    %%                                   {stop, Reason, State}
-    %% @end
-    %%--------------------------------------------------------------------
-    -spec(handle_info(Info :: timeout() | term() , State :: #state{}) ->
-      {noreply , NewState :: #state{}} |
-      {noreply , NewState :: #state{} , timeout() | hibernate} |
-      {stop , Reason :: term() , NewState :: #state{}}).
-    handle_info({task, Task} , State) ->
-      logger:log(critical, "Received task signal ~n"),
-      %% Task propagation to the cluster, including self
-      achlys:bite(Task),
-      {noreply , State};
-    handle_info(_Info , State) ->
-      {noreply , State}.
-
-    %%--------------------------------------------------------------------
-    %% @private
-    %% @doc
-    %% This function is called by a gen_server when it is about to
-    %% terminate. It should be the opposite of Module:init/1 and do any
-    %% necessary cleaning up. When it returns, the gen_server terminates
-    %% with Reason. The return value is ignored.
-    %%
-    %% @spec terminate(Reason, State) -> void()
-    %% @end
-    %%--------------------------------------------------------------------
-    -spec(terminate(Reason :: (normal | shutdown | {shutdown , term()} | term()) ,
-    State :: #state{}) -> term()).
-  terminate(_Reason , _State) ->
+terminate(_Reason , _State) ->
     ok.
 
-  %%--------------------------------------------------------------------
-  %% @private
-  %% @doc
-  %% Convert process state when code is changed
-  %%
-  %% @spec code_change(OldVsn, State, Extra) -> {ok, NewState}
-  %% @end
-  %%--------------------------------------------------------------------
-  -spec(code_change(OldVsn :: term() | {down , term()} , State :: #state{} ,
-  Extra :: term()) ->
-    {ok , NewState :: #state{}} | {error , Reason :: term()}).
-  code_change(_OldVsn , State , _Extra) ->
+code_change(_OldVsn , State , _Extra) ->
     {ok , State}.
 
-  %%%===================================================================
-  %%% Internal functions
-  %%%===================================================================
+%%%===================================================================
+%%% Main Task
+%%%===================================================================
 
-  schedule_task() ->
-    %% Declare an Achlys task that will be
-    %% executed exactly once
-    Task = achlys:declare(mytask
-    , all
-    , single
-    , fun() ->
-      io:format("Hello Joe ! ~n")
-    end),
-    %% Send the task to the current server module
-    %% after a 5000ms delay
-    erlang:send_after(5000, ?SERVER, {task, Task}),
-    ok.
-
-  %%%===================================================================
-
-  loop_schedule_task(0, Time) ->
-    io:format("Finish! ~n"),
-    ok;
-  loop_schedule_task(Count, Time) ->
-    %% Declare an Achlys task that will be
-    %% executed more than once
-    Task = achlys:declare(mytask
-    , all
-    , single
-    , fun() ->
-      println(Count),
-      loop_schedule_task(Count-1, Time)
-    end),
-    {task, Task},
-    %% Send the task to the current server module
-    %% after a 5000ms delay
-    erlang:send_after(Time, ?SERVER, {task, Task}),
-    ok.
-
-  %%%===================================================================
-
-  task_1(Threshold) ->
-    %% Declare an Achlys task that will be periodically
-    %% executed as long as the node is up
+task_1(Threshold) ->
     Task = achlys:declare(task_1
     , all
     , permanent
     , fun() ->
-      logger:log(notice, "Reading PmodNAV pressure interval ~n"),
-      %Press0 = pmod_nav:read(alt, [press_out]),
-      Press0 = rand:uniform(10),
-      %timer:sleep(2000),
-      %Press1 = pmod_nav:read(alt, [press_out]),
-      Press1 = rand:uniform(10),
       Node = erlang:node(),
+      NbNodes = length(erlang:nodes())+1,
+      {ok, {QuakeFlag, _, _, _}} = lasp:declare({<<"quake">>, state_ewflag}, state_ewflag),
+      {ok, {NodesShake, _, _, _}} = lasp:declare({<<"shake">>, state_orset}, state_orset),
+      {ok, {History, _, _, _}} = lasp:declare({<<"history">>, state_gset}, state_gset),
 
-      EWType = state_ewflag,
-      EWVarName = <<"ewvar">>,
-      ORSetType = state_orset,
-      ORSetVarName = <<"orset">>,
-
-      {ok, {EW, _, _, _}} = lasp:declare({EWVarName, EWType}, EWType),
-      {ok, {ORSetA, _, _, _}} = lasp:declare({<<"orseta">>, ORSetType}, ORSetType),
-      {ok, {ORSetB, _, _, _}} = lasp:declare({<<"orsetb">>, ORSetType}, ORSetType),
+      MoveTest = move_detection_rand(10,Threshold),
+      %% MoveTest = move_detection(-1.5, 1.5),
+      %% MoveTest = move_detection_deviation(2.0),
       if
-          abs(Press0 - Press1) > Threshold -> lasp:update(ORSetA, {add, Node}, self()),
-          lasp:update(ORSetB, {add, Node}, self());
+          MoveTest -> lasp:update(NodesShake, {add, Node}, self());
           %grisp_led : color (1, green );
-          true -> lasp:update(ORSetA, {rmv, Node}, self())
+          true -> lasp:update(NodesShake, {rmv, Node}, self())
           %grisp_led : color (2, red )
       end,
-      {ok, ORSet0} = lasp:query(ORSetA),
-      {ok, ORSet1} = lasp:query(ORSetB),
-      L1 = length(sets:to_list(ORSet0)),
-      L2 = length(sets:to_list(ORSet1)),
+      {ok, CountShakes} = lasp:query(NodesShake),
+      L = length(sets:to_list(CountShakes)),
       if
-          (L2 == L1) and (L1 > 0) -> lasp:update(EW, enable, self());
-          true -> lasp:update(EW, disable, self())
-      end,
-      %{ok, {SourceId, _, _, _}} = lasp:declare({<<"source">>, state_orset}, state_orset),
-      %lasp:update(SourceId, {add, {abs(Press0 - Press1), Node}}, self()),
-      {ok, EW0} = lasp:query(EW),
-      println(sets:to_list(ORSet0)),
-      println(sets:to_list(ORSet1)),
-      println(EW0),
-      println(" "),
-      timer:sleep(3000)
-    end).
+          (L == NbNodes) and (L > 0) -> lasp:update(QuakeFlag, enable, self()),
+          lasp:update(History, {add,  get_date() }, self()),
+          println("Earthquake detected !");
+          true -> lasp:update(QuakeFlag, disable, self()),
+          println("nothing")
+      end
+
+      end),
+      {task, Task},
+      gen_server:cast(?SERVER, {task, Task}),
+      ok.
 
 %%%===================================================================
+%%% Helpers functions
+%%%===================================================================
 
-%%logger:log(notice, "Reading PmodNAV measurements ~n"),
-%%Acc = pmod_nav:read(acc, [out_x_xl, out_y_xl, out_z_xl]),
-%%Gyro = pmod_nav:read(acc, [out_x_g, out_y_g, out_z_g]),
-%%Mag = pmod_nav:read(mag, [out_x_m, out_y_m, out_z_m]),
-%%Press = pmod_nav:read(alt, [press_out]),
-%%Temp = pmod_nav:read(alt, [temp_out]),
-%%Node = erlang:node(),
+move_detection(LB,UB) ->
+    logger:log(notice, "Reading PmodNAV Accelerometer ~n"),
+    Xsample = pmod_nav:read(acc, [out_x_xl]),
+    Ysample = pmod_nav:read(acc, [out_y_xl]),
+    Zsample = pmod_nav:read(acc, [out_z_xl]),
+    Maxsample = lists:max((Xsample ++ Ysample) ++ Zsample),
+    Minsample = lists:min((Xsample ++ Ysample) ++ Zsample),
+    if
+        (Minsample < LB) or (Maxsample > UB) -> true;
+        true -> false
+    end.
 
-%test:show().
-%% {ok, Set} = lasp:query({<<"source">>, state_gset}), sets:to_list(Set).
-%% {ok, FarenheitSet} = lasp:query({<<"destination">>, state_orset}), sets:to_list(FarenheitSet).
-%% achlys_util:add_node('achlys1@130.104.213.164').
-%% (achlys2@130.104.213.164)3> achlys:get_all_tasks().
+%%--------------------------------------------------------------------
+
+move_detection_deviation(Threshold) ->
+    Buffer = lists:foldl(fun
+    (Elem,Acc) ->
+        timer : sleep(50),
+        SampleY = pmod_nav:read(acc, [out_y_xl]),
+        SampleZ = pmod_nav:read(acc, [out_z_xl]),
+        [Y] = SampleY,
+        [Z] = SampleZ,
+        Ro = math:atan2(Y,Z),
+        [Ro] ++ Acc
+    end,[],lists:seq(1,5)),
+    SD = math:sqrt(variance(Buffer)),
+    if
+        (SD > Threshold) -> true;
+        true -> false
+    end.
+
+%%--------------------------------------------------------------------
+
+move_detection_rand(Range, Threshold) ->
+    R0 = rand:uniform(Range),
+    R1 = rand:uniform(Range),
+    if
+        abs(R1- R0) > Threshold -> true;
+        true -> false
+    end.
+
+%%--------------------------------------------------------------------
+
+print_query_set(Id, Text) ->
+    {ok , S} = lasp:query(Id) ,
+    io:format(Text ++ "~p~n", [sets:to_list(S)]).
+
+%%--------------------------------------------------------------------
+
+print_query(Id, Text) ->
+    {ok , S} = lasp:query(Id) ,
+    io:format(Text ++ "~p~n", [S]).
+
+%%--------------------------------------------------------------------
+
+get_date() ->
+    {{Y,M,D},{Hour,Min,Sec}} = calendar:now_to_local_time(erlang:now()),
+    {Hour,Min}.
+
+%%--------------------------------------------------------------------
+
+show() ->
+    {ok, {QuakeFlag, _, _, _}} = lasp:declare({<<"quake">>, state_ewflag}, state_ewflag),
+    {ok, {NodesShake, _, _, _}} = lasp:declare({<<"shake">>, state_orset}, state_orset),
+    {ok, {History, _, _, _}} = lasp:declare({<<"history">>, state_gset}, state_gset),
+    io:format("Number of nodes: " ++ "~p~n", [length(erlang:nodes())+1]),
+    print_query_set(NodesShake, "Shaking nodes:  "),
+    print_query_set(History, "List of earthquakes:  "),
+    print_query(QuakeFlag, "Earthquake flag: ").
+
+%%--------------------------------------------------------------------
+
+println(What) -> io:format("~p~n", [What]).
+
+%%--------------------------------------------------------------------
+
+average(List) ->
+    lists:sum(List) / length(List).
+
+%%--------------------------------------------------------------------
+
+variance(List) ->
+    Mean = average(List),
+    NewList = lists:flatmap(fun(Elem)->
+                              [(abs(Elem-Mean))*(abs(Elem-Mean))]
+                          end, List),
+    average(NewList).
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc
+%% Convert process state when code is changed
+%%
+%% @spec code_change(OldVsn, State, Extra) -> {ok, NewState}
+%% @end
+%%--------------------------------------------------------------------
