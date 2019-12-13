@@ -115,8 +115,8 @@ move_detection_deviation(Threshold) ->
     Buffer = lists:foldl(fun
     (Elem,Acc) ->
         timer : sleep(50),
-        SampleY = pmod_nav:read(acc, [out_y_xl]),
-        SampleZ = pmod_nav:read(acc, [out_z_xl]),
+        SampleY = pmod_nav:read(acc, [out_y_g]),
+        SampleZ = pmod_nav:read(acc, [out_z_g]),
         [Y] = SampleY,
         [Z] = SampleZ,
         Ro = math:atan2(Y,Z),
