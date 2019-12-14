@@ -1,13 +1,25 @@
 # Documentation
 ## Disclamer
 
-For now the value from the sensors are random value but you can have the real one by uncommenting the upper code line.
+For now the values from the sensors are random values but you can have the real ones by uncommenting the upper code line.
+
+```erlang
+%Temp = pmod_nav:read(acc,[temp_out]),
+Temp = rand:uniform(100),
+...
+%Press = pmod_nav:read(acc,[press_out]),
+Press = rand:uniform(100),
+...
+%% MoveTest = move_detection(-1.5, 1.5),
+%% MoveTest = move_detection_deviation(2.0),
+MoveTest = move_detection_rand(10,Threshold),
+```
 
 ## gworker
 
 When selected {temperature,pressure} task, you can with the arguments Mode1 and Mode2 compute one of the measure combine with another one. 
 
-For example you can compute the global average of the minimum temperature with a local buffer of 5,where there is 1000 ms between each sensors activation and where there is a lower bound and upper bound for temperature value, between all the mote with the same task with the command : 
+For example you can compute the global average of the minimum temperature with a local buffer of 5, where there is 1000 ms lap between each sensors activation and where there is a lower bound and upper bound for temperature value, between all the mote with the same task with the command : 
 - gworker:add_task_temp(min,mean,5,1000,-80,100). 
 
 <p align="center">
@@ -35,7 +47,7 @@ With arguments :
 
 The goal of this distributed program is to dectect earthquakes or seismic disturbances using several GRISP boards connected together. Thanks to the sensors we can gather data like 3D accelerometer or gyroscope and process them to detect the slightest movement or vibration.
 
-Each grisp execute a permanent task that will regularly sense the vibrations of the ground. In case of movement detecection, the program shares its id with other nodes in the network to inform that a movement has been detected. Since there may be many false positives, an earthquake alert will only be activated if almost all connected nodes have detected a recent movement.
+Each grisp execute a permanent task that will regularly sense the vibrations of the ground. In case of movement detection, the program shares its id with other nodes in the network to inform that a movement has been detected. Since there may be many false positives, an earthquake alert will only be activated if almost all connected nodes have detected a recent movement.
 
 
 <p align="center">
@@ -43,18 +55,19 @@ Each grisp execute a permanent task that will regularly sense the vibrations of 
   <img src="resources/quake1.png" alt="EDoc" width="400"/>
 </p>
 
+
 ### Usage 
 
 Command to initialize the node: 
 - earthquake:start_link().
 
-The task is direcly launched once the once the command is activated, and is performed permanently in cycle. We can add now several nodes to the task with: 
+The task is direcly launched once the command is activated, and is performed permanently in cycle. We can add now several nodes to the task with: 
 - achlys_util:add_node('achlys_id').
 
-Nodes display periodically whether an earthquake has been detected globally or not. To access all CRDT Lasp variables, you must activate the command: 
+Nodes display periodically whether an earthquake has been detected globally or not. To access to all CRDT Lasp variables, you must activate the command: 
 - earthquake:show(). 
 
-All the nodes that have moved and an earthquake history (hour and minute) will be displayed. Here is the log for one node. The task was distributed on 3 nodes.
+All the nodes that have moved and an earthquake history (hour and minute) will be displayed. Here is the log for one node. The task was distributed on 3 nodes in this example.
 
 ```txt
 (achlys1@192.168.1.4)1> earthquake:start_link().
