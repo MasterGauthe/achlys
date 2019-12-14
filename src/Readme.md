@@ -44,6 +44,20 @@ Each grisp exectue a permanent task that will regularly sense the vibrations of 
 
 
 <p align="center">
-  <img src="resources/quake0.jpg" alt="EDoc"/>
-  <img src="resources/quake1_gworker.jpg" alt="EDoc"/>
+  <img src="resources/quake0.png" alt="EDoc"/>
+  <img src="resources/quake1.png" alt="EDoc"/>
 </p>
+
+### Usage 
+
+Command to initialize the node: earthquake:start_link().
+The task is direcly launched once the once the command is activated, and is performed permanently in cycle.
+
+We can add now several nodes to the task with: achlys_util:add_node('achlys_id').
+
+Nodes display periodically whether an earthquake has been detected globally or not. To access all CRDT Lasp variables, you must activate the command: earthquake:show(). All the nodes that have moved and an earthquake history with the hour and minute will be displayed.
+
+```txt
+  test
+  test
+```
