@@ -37,3 +37,9 @@ With arguments :
 
 
 ## earthquake
+
+The goal of this distributed program is to dectect eartquake or seismic disturbance using several GRISP boards connected together. Thanks to the sensors we can gather data like 3D Accelerometer or Gyroscope and process them to detect the slightest movement or vibration.
+
+Each grisp exectue a permanent task that will regularly sense the vibrations of the ground. In case of movement detecection, the program shares its id with other nodes in the network to inform that a movement has been detected. Since there may be many false positives, an earthquake alert will only be activated if almost all connected nodes have detected a recent movement.
+
+to continue...
