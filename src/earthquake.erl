@@ -184,12 +184,3 @@ variance(List) ->
                               [(abs(Elem-Mean))*(abs(Elem-Mean))]
                           end, List),
     average(NewList).
-
-%%--------------------------------------------------------------------
-%% @private
-%% @doc
-%% Convert process state when code is changed
-%%
-%% @spec code_change(OldVsn, State, Extra) -> {ok, NewState}
-%% @end
-%%--------------------------------------------------------------------
