@@ -107,7 +107,7 @@ temperature(Mode1, Mode2, Len, SampleRate,LB,UB) ->
       Buffer = lists:foldl(fun
         (Elem,AccIn) ->
           timer : sleep(SampleRate), %10 measurements per minute
-          %Temp = pmod_nav:read(acc,[out_temp]),
+          %[Temp] = pmod_nav:read(acc,[out_temp]),
           Temp = rand:uniform(100),
           if
             Temp < UB ->
@@ -187,7 +187,7 @@ pressure(Mode1, Mode2, Len, SampleRate,LB,UB) ->
     Buffer = lists:foldl(fun
       (Elem,AccIn) ->
         timer : sleep(SampleRate), %10 measurements per minute
-        %Temp = pmod_nav:read(acc,[press_out]),
+        %[Press] = pmod_nav:read(acc,[press_out]),
         Press = rand:uniform(100),
         if
           Press < UB ->
