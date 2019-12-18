@@ -4,10 +4,10 @@
 For now the values from the sensors are random values but you can have the real ones by uncommenting the upper code line.
 
 ```erlang
-%Temp = pmod_nav:read(acc,[temp_out]),
+%[Temp] = pmod_nav:read(acc,[temp_out]),
 Temp = rand:uniform(100),
 ...
-%Press = pmod_nav:read(acc,[press_out]),
+%[Press] = pmod_nav:read(acc,[press_out]),
 Press = rand:uniform(100),
 ...
 %% MoveTest = move_detection(-1.5, 1.5),
